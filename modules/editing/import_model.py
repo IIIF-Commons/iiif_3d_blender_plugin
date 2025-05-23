@@ -44,16 +44,6 @@ class ImportModel(Operator, ImportHelper):
         subtype="NONE",
     )
 
-
-    def import_model(self, filepath: str) -> None:
-        """Import the model file using the appropriate Blender importer"""
-        file_ext = os.path.splitext(filepath)[1].lower()
-
-        if file_ext == ".glb" or file_ext == ".gltf":
-            bpy.ops.import_scene.gltf(filepath=filepath)
-        else:
-            raise ValueError(f"Unsupported file format: {file_ext}")
-
         
     def execute(self, context: Context) -> Set[str]:
 
