@@ -8,6 +8,7 @@ from .modules.exporter import ExportIIIF3DManifest
 from .modules.importer import ImportIIIF3DManifest
 from .modules.editing.import_model import ImportLocalModel, ImportNetworkModel
 from .modules.editing.new_manifest import NewManifest
+from .modules.editing.new_camera import NewCamera
 
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
@@ -35,10 +36,7 @@ class OUTLINER_MT_edit_manifest(Menu):
         target_collection = context.collection
         layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
         layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
-        
-        """
-        operators for adding a camera and light will be added
-        """
+        layout.operator(NewCamera.bl_idname, text="Add Camera")
 
 def menu_func_manifest_submenu(self,context):
     target_collection = context.collection
@@ -56,6 +54,7 @@ classes = (
     IIIF3DObjMetadataPanel,
     IIIF3DCollMetadataPanel,
     NewManifest,
+    NewCamera,
     OUTLINER_MT_edit_manifest
 )
 
