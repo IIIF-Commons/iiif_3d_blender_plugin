@@ -8,6 +8,8 @@ from bpy.types import Context, Operator
 import math
 
 from .initialize_collections import initialize_annotation
+from ..utils.blender_setup import configure_camera
+from ..utils.coordinates import Coordinates
 
 import logging
 logger = logging.getLogger("iiif.new_camera")
@@ -29,7 +31,11 @@ class NewCamera(Operator):
         try:
             # developer note: eventually an initial location, rotation, scale can be
             # set here
-            retCode = bpy.ops.object.camera_add()
+            init_location = Coordinates.iiif_position_to_blender_vector( (0,0,10.0))
+            init_rotation = Coordinates.camera_transform_angles_to_blender_euler( (0,0,0))
+            retCode = bpy.ops.object.camera_add(    location=init_location, 
+                                                    rotation=init_rotation
+                                                )
             logger.info("obj.camera_add %r" % (retCode,))
         except Exception as exc:
             logger.error("glTF import error", exc)
@@ -37,6 +43,7 @@ class NewCamera(Operator):
         
         new_camera = bpy.context.active_object
         logger.info("new_camera: %r" % (new_camera,))
+        configure_camera(new_camera)
 
         annotation_collection=bpy.data.collections.new("Annotation")
         initialize_annotation( annotation_collection )    

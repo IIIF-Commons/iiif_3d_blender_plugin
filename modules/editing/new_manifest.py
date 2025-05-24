@@ -8,6 +8,9 @@ from bpy.types import Context, Operator
 import math
 
 from .initialize_collections import initialize_manifest,initialize_scene,initialize_anotation_page
+
+from ..utils.blender_setup import configure_blender_scene
+
 import logging
 logger = logging.getLogger("iiif.new_manifest")
 
@@ -20,6 +23,8 @@ class NewManifest(Operator):
 
     def execute(self, context):
         logger.info("called build")
+        configure_blender_scene()
+        
         manifest=bpy.data.collections.new("IIIF Manifest")
         initialize_manifest( manifest )    
         bpy.context.scene.collection.children.link(manifest)
