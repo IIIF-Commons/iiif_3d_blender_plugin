@@ -10,7 +10,6 @@ from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector
 
 from .initialize_collections import initialize_annotation
-
 import math
 import json
 import logging

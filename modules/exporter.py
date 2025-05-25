@@ -121,9 +121,21 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         and scale.
         """
         resource_type = blender_obj.get("iiif_type")
+        logger.info("getting resource data for %s" % resource_type)
         if resource_type == "Model":
             return self.resource_data_for_model(blender_obj, anno_collection)
+        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
+            return self.resource_data_for_camera(blender_obj, anno_collection)
+        else:
+            logger.error("type %s unsupported for export" % resource_type )
+            return {}
 
+    def resource_data_for_camera(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        resource_data = self.get_base_data(blender_obj)
+
+        resource_data["fieldOfView"] =  math.degrees(blender_obj.data.angle_y)
+        return resource_data
+        
     def resource_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
         return self.get_base_data(blender_obj)
 
@@ -131,6 +143,9 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         resource_type = blender_obj.get("iiif_type")
         if resource_type == "Model":
             return self.specific_data_for_model(blender_obj, resource_data , anno_collection)
+        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
+            return self.specific_data_for_camera(blender_obj, resource_data , anno_collection)
+            
         
     def specific_data_for_model(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ):
         """
@@ -143,8 +158,8 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
             # the angle property can be used to decide if this is,
             # essentially a 0-rotation, to within sensible precision
             abs_angle = abs(quat.angle)
-            logger.info("abs(angle) of a model rotation: %.2e" % abs_angle)
-            if abs_angle > 1.0e-6:
+            
+            if abs_angle > 1.0e-5:
                 iiif_rotation = Coordinates.blender_rotation_to_model_transform_angles(quat)
                 transforms.append(
                     create_axes_named_values("RotateTransform", iiif_rotation)
@@ -182,11 +197,44 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
             retVal = resource_data
             
         return retVal
+
+    def specific_data_for_camera(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ):
+        """
+        """
+        transforms = list()
+        saved_mode = blender_obj.rotation_mode
+        try:
+            blender_obj.rotation_mode = "QUATERNION"
+            quat = blender_obj.rotation_quaternion
+            # the angle property can be used to decide if this is,
+            # essentially a 0-rotation, to within sensible precision
+            abs_angle = abs(quat.angle)
+            
+            if abs_angle > 1.0e-5:
+                iiif_rotation = Coordinates.blender_rotation_to_camera_transform_angles(quat)
+                transforms.append(
+                    create_axes_named_values("RotateTransform", iiif_rotation)
+                )
+        finally:
+            blender_obj.rotation_mode = saved_mode
+            
+         
+        if transforms:
+            retVal = {
+                "type" : "SpecificResource",
+                "source" : resource_data,
+                "transform" : transforms
+            }
+        else:
+            retVal = resource_data
+            
+        logger.info("returning body for camera: %r" % retVal)
+        return retVal
         
         
         
     def target_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
-        if blender_obj.get("iiif_type", None) in ("Model"):
+        if blender_obj.get("iiif_type", None) in ("Model","PerspectiveCamera"):
             return self.target_data_for_model(blender_obj, anno_collection )
         else:
             self.warning("invalid object %r in target_data_for_object" % (blender_obj),)

@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger("iiif.initialize_collections")
+logger.setLevel(logging.INFO)
 
 import bpy
 import json
@@ -94,6 +97,7 @@ def initialize_annotation( annotation_collection ):
         "type" : None
     }
     annotation_collection["iiif_json"] = json.dumps(anno_init_data)
+ 
     
 def generate_uri(resource_type="Manifest"):
     """
@@ -101,5 +105,15 @@ def generate_uri(resource_type="Manifest"):
     generate a more useful valid , globally unique, and publically
     accessible URI 
     """
-    indexer=1
-    return "https://example.com/iiif_blender_plugin/%s/%i" % (resource_type.lower(),indexer)
+    import re
+    prefix = "https://example.com/iiif_blender_plugin/%s/" % resource_type.lower()
+    re_pattern= re.compile( prefix+r"([0-9]+)\s*$" )
+    imax=0
+    for obj_or_col in ( list(bpy.data.objects) + list(bpy.data.collections) ):
+        match = re_pattern.match( obj_or_col.get("iiif_id", ""))
+        if match:
+            val = int( match.group(1) )
+            
+            imax = max(imax,val)
+    retVal = prefix + str(imax+1)
+    return retVal

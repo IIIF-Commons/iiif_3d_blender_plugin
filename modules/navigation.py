@@ -1,6 +1,6 @@
 import logging
 logger = logging.getLogger("iiif.navigation")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 import bpy
 
@@ -47,7 +47,6 @@ def _find_enclosing_resource(iiif_resource, enclosing_type):
         "Scene" : "Manifest"
     }
     search_id = iiif_resource.get("iiif_id", None)
-    logger.info("searching for %s that contains iiif_id: %r" % (enclosing_type, search_id))
     if search_id is None:
         return None
         
