@@ -512,35 +512,49 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
     def process_annotation(
         self, annotation_data: dict, parent_collection: Collection
     ) -> None:
-        body = force_as_object(
+        target_data =  force_as_object(
+            force_as_singleton(annotation_data.get("target", None)), default_type="Scene"
+        )
+        if target_data:
+            del annotation_data["target"]
+        
+        body_data = force_as_object(
             force_as_singleton(annotation_data.get("body", None)), default_type="Model"
         )
-        if body is None:
+        if body_data:
+            del annotation_data["body"]
+        else: 
             bodyValue = force_as_singleton(annotation_data.get("bodyValue", None))
             if type(bodyValue) is str:
-                body = {"type": "TextualBody", "value": bodyValue}
+                body_data = {"type": "TextualBody", "value": bodyValue}
+                del annotation_data["bodyValue"]
             else:
                 logger.warning(
                     "annotation %s has no body property" % annotation_data["id"]
                 )
-                return
+                
+        anno_collection = self.create_or_get_collection(annotation_data["id"], parent_collection)
+        anno_collection["iiif_id"]   = annotation_data["id"]
+        anno_collection["iiif_type"] = annotation_data["type"]
+        anno_collection["iiif_json"] = json.dumps(annotation_data)
+        
+        bodyObj = self.body_to_object(body_data, target_data, parent_collection)
+        return
 
-        if body["type"] == "Model":
-            self.process_annotation_model(
-                body, None, annotation_data, parent_collection
-            )
-        elif body["type"] == "PerspectiveCamera":
-            self.process_annotation_camera(
-                body, None, annotation_data, parent_collection
-            )
-        elif body["type"] in ["AmbientLight", "DirectionalLight"]:
-            self.process_annotation_light(annotation_data, parent_collection)
-        elif body["type"] == "SpecificResource":
-            self.process_annotation_specific_resource(
-                annotation_data, parent_collection
-            )
-        else:
-            logger.warning("body type %s not supported for Blender" % body["type"])
+    def body_to_object(self, body_data : dict, target_data: dict, anno_collection:Collection) -> bpy.types.Object:
+        """
+        body is the  python dictionry obtained by unpacking hte json value of the body property.
+        type of the outer layer of th dictionary may be SpecificResource, or may
+        be Model, PerspectiveCamera
+        
+        The action of this function will be to create the Blender object, locate and
+        orient the blender object; configure the Blender object via the properties in the
+        body (or, as necesssary, SpecificResource.source). The created Blender object is returned
+        
+        returns a tuple of the dict obtained from the body or source, and the object itself
+        These will contain information necessary to constr
+        """        
+        return None
 
     def process_annotation_page(
         self, annotation_page_data: dict, scene_collection: Collection
@@ -548,26 +562,22 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         page_collection = self.create_or_get_collection(
             self.get_iiif_id_or_label(annotation_page_data), scene_collection
         )
-
+        
         for item in annotation_page_data.get("items", []):
             if item.get("type") == "Annotation":
                 self.process_annotation(item, page_collection)
             else:
                 self.report({"WARNING"}, f"Unknown item type: {item.get('type')}")
 
-    def process_scene(self, scene_data: dict, manifest_collection: Collection) -> None:
+    def process_scene(self, scene_data: dict, manifest_collection) -> None:
         """Process annotation pages in a scene"""
         scene_collection = self.create_or_get_collection(
             self.get_iiif_id_or_label(scene_data), manifest_collection
         )
         context = bpy.context
-        if not context:
-            self.report({"ERROR"}, "No active context")
-            return
 
         metadata = IIIFMetadata(scene_collection)
         metadata.store_scene(scene_data)
-        #metadata.store_manifest(self.manifest_data)
 
         if "backgroundColor" in scene_data:
             self.report(
@@ -582,13 +592,15 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             except Exception as e:
                 self.report({"ERROR"}, f"Error setting background color: {e}")
 
-        for item in scene_data.get("items", []):
-            if item.get("type") == "AnnotationPage":
-                self.process_annotation_page(item, scene_collection)
-            elif item.get("type") == "Annotation":
-                self.process_annotation(item, scene_collection)
-            else:
-                self.report({"WARNING"}, f"Unknown item type: {item.get('type')}")
+        scene_collection["iiif_id"] = scene_data["id"]
+        scene_collection["iiif_type"] = "Scene"
+        
+        if "items" in scene_data:
+            for item in scene_data.get("items", [])[:]:
+                if item.get("type") == "AnnotationPage":
+                    self.process_annotation_page(item, scene_collection)
+                    scene_data["items"].remove(item)
+        scene_collection["iiif_json"] = json.dumps( scene_data )
 
     def process_manifest(self, manifest_data: dict) -> None:
         """Process the manifest data and import the model"""
@@ -597,37 +609,18 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         main_collection = self.create_or_get_collection("IIIF Manifest")
         metadata = IIIFMetadata(main_collection)
         metadata.store_manifest(manifest_data)
+        
+        main_collection["iiif_id"] = manifest_data["id"]
+        main_collection["iiif_type"] = "Manifest"
 
-        scenes = list()
-        for item in manifest_data.get("items", []):
-            if item.get("type") == "Scene":
-                scenes.append(item)
-            else:
-                self.report({"WARNING"}, f"Unknown item type: {item.get('type')}")
+        if "items" in manifest_data:
+            for item in manifest_data["items"][:]: # iterate over a copy
+                if item.get("type",None) == "Scene":
+                    self.process_scene(item, main_collection)
+                    manifest_data["items"].remove(item)
 
-        if len(scenes) == 0:
-            self.report({"ERROR"}, "No scenes found in manifest")
-            return
-
-        for scene in scenes:
-            self.process_scene(scene, main_collection)
-
-        context = bpy.context
-        if not context:
-            return
-
-        setattr(context.scene, "iiif_manifest_id", manifest_data.get("id", ""))
-        setattr(
-            context.scene,
-            "iiif_manifest_label",
-            manifest_data.get("label", {}).get("en", [""])[0],
-        )
-        setattr(
-            context.scene,
-            "iiif_manifest_summary",
-            manifest_data.get("summary", {}).get("en", [""])[0],
-        )
-
+        main_collection["iiif_json"] = json.dumps(manifest_data)
+                
     def execute(self, context: Context) -> Set[str]:
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
