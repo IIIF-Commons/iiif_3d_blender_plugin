@@ -2,7 +2,7 @@ schema_version = "1.0.0"
 
 id = "blender_iiif_3d_plugin"
 name = "Blender IIIF Manifest Import/Export"
-version = "1.0.0"
+version = "0.2.0"
 tagline = "Import or export IIIF manifests"
 maintainer = "Developer name <email@address.com>"
 
@@ -28,4 +28,5 @@ paths_exclude_pattern = [
     "venv",
     "assets",
     ".gitignore",
+    ".DS_Store"
 ]
