@@ -212,212 +212,6 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         label = data.get("label", {}).get("en", [iiif_id])[0]
         return label
 
-    def process_annotation_model(
-        self,
-        source_data: dict,
-        specific_resource_data: dict,
-        annotation_data: dict,
-        parent_collection: Collection,
-    ) -> None:
-        context = bpy.context
-        if not context:
-            self.report({"ERROR"}, "No active context")
-            return
-
-        # Set the parent collection as active
-        layer_collection = context.view_layer.layer_collection
-        for child in layer_collection.children:
-            if child.collection == parent_collection:
-                context.view_layer.active_layer_collection = child
-                break
-
-        model_id = source_data.get("id", None)
-        if not model_id:
-            self.report({"ERROR"}, "Model ID not found in annotation data")
-            logger.error("Model ID not found in annotation data")
-            return
-        else:
-            logger.debug("loading model_id: %s" % model_id)
-
-        self.report({"DEBUG"}, f"Processing model: {model_id}")
-        temp_file = self.download_model(model_id)
-        self.import_model(temp_file)
-        new_model = bpy.context.active_object
-        logger.info("new_model: %r from url: %s" % (new_model, model_id))
-
-        transform_data = specific_resource_data and force_as_list(
-            specific_resource_data.get("transform", None)
-        )
-
-        if transform_data:
-            rotation_data = force_as_singleton(
-                [t for t in transform_data if t["type"] in {"RotateTransform"}]
-            )
-            if rotation_data:
-                iiif_angles = axes_named_values(rotation_data)
-                blender_euler = Coordinates.model_transform_angles_to_blender_euler(
-                    iiif_angles
-                )
-                logger.debug(
-                    "implement IIIF rotation: %r as %r" % (iiif_angles, blender_euler)
-                )
-                new_model.rotation_mode = blender_euler.order
-                new_model.rotation_euler = blender_euler
-
-            scale_data = force_as_singleton(
-                [t for t in transform_data if t["type"] in {"ScaleTransform"}]
-            )
-            if scale_data:
-                axes_scale = axes_named_values(scale_data)
-                # pending clarification by Presentation 4 editors will only
-                # support uniform scale by a positive value
-                if not (
-                    axes_scale[0] == axes_scale[1] and axes_scale[1] == axes_scale[2]
-                ):
-                    logger.warning(
-                        "non-uniform scale factors not supported: %s" % (axes_scale,)
-                    )
-                elif axes_scale[0] <= 0.0:
-                    logger.warning(
-                        "non-positive scale %f not supported" % axes_scale[0]
-                    )
-                else:
-                    new_model.scale = Vector(axes_scale)
-
-            translateTransforms = [
-                t for t in transform_data if t["type"] in {"TranslateTransform"}
-            ]
-            if len(translateTransforms) > 1:
-                logger.warning(
-                    "multiple TranslateTransform instances in transform property not supported"
-                )
-            elif len(translateTransforms) == 1:
-                translate_data = translateTransforms[0]
-                if translate_data != transform_data[-1]:
-                    logger.warning(
-                        "TranslateTransform must be last item of transforms value"
-                    )
-                translate_vector = Coordinates.iiif_position_to_blender_vector(
-                    axes_named_values(translate_data)
-                )
-                new_model.location = new_model.location + translate_vector
-
-        target_data = force_as_object(
-            force_as_singleton(annotation_data.get("target", None)),
-            default_type="Scene",
-        )
-
-        if target_data and target_data["type"] in {"SpecificResource"}:
-            selector_data = force_as_singleton(target_data.get("selector", None))
-            if selector_data and selector_data["type"] in {"PointSelector"}:
-                iiif_pos = axes_named_values(selector_data)
-                blender_vector = Coordinates.iiif_position_to_blender_vector(iiif_pos)
-                logger.debug(
-                    "placing model at iiif coordinates %r blender: %r"
-                    % (iiif_pos, blender_vector)
-                )
-                new_model.location = new_model.location + blender_vector
-
-        # Move newly imported objects to the parent collection and store metadata
-        for obj in context.selected_objects:
-            # Store the annotation data
-            metadata = IIIFMetadata(obj)
-            metadata.store_annotation(annotation_data)
-
-            # Store additional properties for easy access
-            obj["annotation_id"] = annotation_data.get("id")
-            obj["iiif_source_url"] = model_id
-
-            if obj.users_collection:
-                for col in obj.users_collection:
-                    col.objects.unlink(obj)
-            parent_collection.objects.link(obj)
-
-    def process_annotation_camera(
-        self,
-        camera_data: dict,
-        specific_resource_data: dict,
-        annotation_data: dict,
-        parent_collection: Collection,
-    ) -> None:
-        """
-        This function will create a Blender camera, orient it, and place it in the
-        Blender scene. It will also set the properties of the camera (the Blender
-        representation of "fieldOfView" though this is not yet implemented)
-
-        camera_data : a dictionary giving the properties of the camera resource
-        preContract: camera_data['id'] = "PerspectiveCamera"
-
-        specific_resource_data : dictonary giving properties of the SpecificResource
-        that has the camera as its "source" property
-        If there is no such SpecificResource then this should be set to None
-
-        annotation_data: the data for the entire annotation
-
-        """
-        logger.debug("specific_resources_data: %r", specific_resource_data)
-        # Create camera
-        cam_obj = self.create_camera(camera_data, parent_collection)
-
-        # Store the complete annotation data
-        metadata = IIIFMetadata(cam_obj)
-        metadata.store_annotation(annotation_data)
-
-        # position camera
-        target_data = force_as_object(
-            force_as_singleton(annotation_data.get("target", None)),
-            default_type="Scene",
-        )
-        if target_data and target_data["type"] in {"SpecificResource"}:
-            selector_data = force_as_singleton(target_data.get("selector", None))
-            if selector_data and selector_data["type"] in {"PointSelector"}:
-                iiif_pos = axes_named_values(selector_data)
-                blender_vector = Coordinates.iiif_position_to_blender_vector(iiif_pos)
-                logger.debug(
-                    "placing model at iiif coordinates %r blender: %r"
-                    % (iiif_pos, blender_vector)
-                )
-                cam_obj.location = blender_vector
-
-        # orient camera_data
-        # Set camera target
-        look_at_data = force_as_singleton(camera_data.get("lookAt", None))
-        transform_data = force_as_list(
-            specific_resource_data and specific_resource_data.get("transform", None)
-        )
-
-        if look_at_data is None and transform_data == []:
-            logger.warning("camera has no orientation specified")
-        if look_at_data is not None and len(transform_data) > 0:
-            logger.warning(
-                "ambigous camera orientation; using lookAt; ignoring transform"
-            )
-
-        if look_at_data:
-            self.set_camera_target(cam_obj, look_at_data)
-        elif transform_data:
-            if not (
-                len(transform_data) == 1
-                and transform_data[0].get("type", None) == "RotateTransform"
-            ):
-                logger.error("Unsupported transforms resource %r" % transform_data)
-                return
-            rotation_data = transform_data[0]
-            iiif_angles = axes_named_values(rotation_data)
-            blender_euler = Coordinates.camera_transform_angles_to_blender_euler(
-                iiif_angles
-            )
-            logger.debug(
-                "implement IIIF rotation: %s as Blender %r"
-                % (iiif_angles, blender_euler)
-            )
-            cam_obj.rotation_mode = blender_euler.order
-            cam_obj.rotation_euler = blender_euler
-
-        # Store additional properties
-        cam_obj["annotation_id"] = annotation_data.get("id")
-        cam_obj["iiif_source_url"] = camera_data.get("id")
-
     def process_annotation_light(
         self, annotation_data: dict, parent_collection: Collection
     ) -> None:
@@ -473,41 +267,6 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         }
         return light_type_map.get(iiif_light_type, "POINT")
 
-    def process_annotation_specific_resource(
-        self, annotation_data: dict, parent_collection: Collection
-    ) -> None:
-        """Process SpecificResource type annotations (like transformed lights)"""
-        specific_resource_data = force_as_singleton(annotation_data.get("body", None))
-        if specific_resource_data is None:
-            logger.error("specific_resource_data is None")
-            return
-
-        source_data = force_as_object(
-            force_as_singleton(specific_resource_data.get("source", None)),
-            default_type="Mpdel",
-        )
-        if source_data is None:
-            logger.error("specific_resource_data['source'] is None")
-            return
-
-        if source_data["type"] in {"PerspectiveCamera", "OrthographicCamera"}:
-            self.process_annotation_camera(
-                source_data, specific_resource_data, annotation_data, parent_collection
-            )
-            return
-
-        if source_data["type"] in {"Model"}:
-            self.process_annotation_model(
-                source_data, specific_resource_data, annotation_data, parent_collection
-            )
-            return
-
-        # Create the light first
-        light_annotation = annotation_data.copy()
-        light_annotation["body"] = source
-        self.process_annotation_light(light_annotation, parent_collection)
-
-        # TODO: Transforms
 
     def process_annotation(
         self, annotation_data: dict, parent_collection: Collection
@@ -538,7 +297,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         anno_collection["iiif_type"] = annotation_data["type"]
         anno_collection["iiif_json"] = json.dumps(annotation_data)
         
-        bodyObj = self.body_to_object(body_data, target_data, parent_collection)
+        bodyObj = self.body_to_object(body_data, target_data, anno_collection )
         return
 
     def body_to_object(self, body_data : dict, target_data: dict, anno_collection:Collection) -> bpy.types.Object:
@@ -596,11 +355,22 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
             
         if placement_data["rotation"] is not None:
-            new_model.rotation_euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
-            
+            saved_mode = new_model.rotation_mode
+            try:
+                euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
+                new_model.rotation_mode = euler.order
+                new_model.rotation_euler = euler
+            finally:
+                new_model.rotation_mode = saved_mode            
+
         if placement_data["scale"] is not None:
             new_model.scale = Vector( placement_data["scale"] )
             
+        # ensure the model is in the anno_collection; this is
+        # required for IIIF Manifest export
+        for col in new_model.users_collection:
+            col.objects.unlink(new_model)
+        anno_collection.objects.link(new_model)
         return new_model
         
     def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
