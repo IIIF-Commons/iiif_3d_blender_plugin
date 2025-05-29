@@ -553,9 +553,42 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
         returns a tuple of the dict obtained from the body or source, and the object itself
         These will contain information necessary to constr
-        """        
-        return None
+        """     
+        # placement_data is a dictionary whose entries will be filled with 
+        # values from target and body, if either or both are SpecificResources   
+        placement_data = {
+        "location" : None,
+        "rotation" : None,
+        "scale"    : None
+        }
+        
+        self.update_placement_from_target(target_data, placement_data)
+        if body_data["type"] == "SpecificResource":
+            resource_data = force_as_object(
+                force_as_singleton(body_data.get("source", None)), default_type="Model"
+            )
+            self.update_placement_from_body(target_data, placement_data)
+        else:
+            resource_data = body_data
+        bodyObj = self.resource_to_obj(resource_data, placement_data, anno_collection):
+        return bodyObj
+        
+        def resource_data_to_object(self, resource_data, placement_data, anno_collection):
+            resource_type = resource_data["type"]
+            if resource_type == "Model":
+                return self.resource_data_to_model(resource_data, placement_data, anno_collection)
+            elif resource_type in ("PerspectiveCamera",)
+                return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
+            else:
+                logger.warning("Resource type %s not supported for annotation body")
+            return None
 
+        def resource_data_to_model(self, resource_data, placement_data, anno_collection):
+            return None
+            
+        def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
+            return None
+            
     def process_annotation_page(
         self, annotation_page_data: dict, scene_collection: Collection
     ) -> None:
