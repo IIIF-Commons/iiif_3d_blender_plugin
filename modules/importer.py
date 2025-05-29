@@ -567,28 +567,87 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             resource_data = force_as_object(
                 force_as_singleton(body_data.get("source", None)), default_type="Model"
             )
-            self.update_placement_from_body(target_data, placement_data)
+            self.update_placement_from_body(body_data, placement_data)
         else:
             resource_data = body_data
-        bodyObj = self.resource_to_obj(resource_data, placement_data, anno_collection):
+        bodyObj = self.resource_data_to_object(resource_data, placement_data, anno_collection)
         return bodyObj
         
-        def resource_data_to_object(self, resource_data, placement_data, anno_collection):
-            resource_type = resource_data["type"]
-            if resource_type == "Model":
-                return self.resource_data_to_model(resource_data, placement_data, anno_collection)
-            elif resource_type in ("PerspectiveCamera",)
-                return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
-            else:
-                logger.warning("Resource type %s not supported for annotation body")
-            return None
+    def resource_data_to_object(self, resource_data, placement_data, anno_collection):
+        resource_type = resource_data["type"]
+        if resource_type == "Model":
+            return self.resource_data_to_model(resource_data, placement_data, anno_collection)
+        #elif resource_type in ("PerspectiveCamera",)
+        #    return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
+        else:
+            logger.warning("Resource type %s not supported for annotation body" % resource_type)
+        return None
 
-        def resource_data_to_model(self, resource_data, placement_data, anno_collection):
-            return None
+    def resource_data_to_model(self, resource_data, placement_data, anno_collection):
+        """
+        download, create, and configure model object
+        """
+        model_id = resource_data.get("id", None)
+        temp_file = self.download_model(model_id)
+        self.import_model(temp_file)
+        new_model = bpy.context.active_object
+        
+        if placement_data["location"] is not None:
+            new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
             
-        def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
-            return None
+        if placement_data["rotation"] is not None:
+            new_model.rotation_euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
             
+        if placement_data["scale"] is not None:
+            new_model.scale = Vector( placement_data["scale"] )
+            
+        return new_model
+        
+    def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
+        return None
+    
+    def update_placement_from_target(self, target_data, placement_data):
+        """
+        examines the content of target_data dictionary and identify if
+        properties of the target determine information on placement of model 
+        in the Blender scene
+        
+        At this implementation the case of the target_data representing a SpecificResource
+        with a PointSelector will be handled.
+        
+        value of the location property will be set with a 3-tuple in IIIIF Coordinates       
+        """
+        if  target_data["type"] == "SpecificResource":
+            sel = force_as_singleton( target_data["selector"] )
+            if sel and sel["type"] == "PointSelector":
+                placement_data["location"] = axes_named_values( sel )
+        return
+        
+    def update_placement_from_body(self, body_data, placement_data):
+        """
+        examines the content of body_data dictionary and identify if
+        properties of the body determine information on placement of model 
+        in the Blender scene
+        
+        At this implementation the case of the target_data representing a SpecificResource
+        with a transform property
+        
+        value of the rotation and scale property will be set with a 3-tuple in IIIIF Coordinates 
+        """
+        if  body_data["type"] == "SpecificResource" and \
+            body_data.get("transform", False):
+            for transform in force_as_list(body_data["transform"]):
+                for transform_compare, placement_property in (
+                    ("RotateTransform","rotation"),
+                    ("ScaleTransform","scale"),
+                ):
+                    transform_type = transform["type"]
+                    if transform_type == transform_compare:
+                        if placement_data[placement_property] is not None:
+                            logger.warning("%s is being overwritten" % placement_property)
+                        placement_data[placement_property] = axes_named_values(transform)
+        return
+           
     def process_annotation_page(
         self, annotation_page_data: dict, scene_collection: Collection
     ) -> None:
