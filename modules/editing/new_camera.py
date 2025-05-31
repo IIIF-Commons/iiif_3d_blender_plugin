@@ -39,7 +39,7 @@ class NewCamera(Operator):
                                                 )
             logger.info("obj.camera_add %r" % (retCode,))
         except Exception as exc:
-            logger.error("glTF import error", exc)
+            logger.error("add camera error", exc)
             return {"FINISHED"}
         
         new_camera = bpy.context.active_object
