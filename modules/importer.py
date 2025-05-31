@@ -19,6 +19,9 @@ from .utils.json_patterns import (
     force_as_list,
     axes_named_values,
 )
+
+from .utils.blender_setup import configure_camera
+
 import math
 
 import logging
@@ -336,8 +339,8 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         resource_type = resource_data["type"]
         if resource_type == "Model":
             return self.resource_data_to_model(resource_data, placement_data, anno_collection)
-        #elif resource_type in ("PerspectiveCamera",)
-        #    return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
+        elif resource_type in ("PerspectiveCamera",):
+            return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
         else:
             logger.warning("Resource type %s not supported for annotation body" % resource_type)
         return None
@@ -374,7 +377,37 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         return new_model
         
     def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
-        return None
+        """
+        download, create, and configure camera object
+        """
+
+        try:
+            # developer note: eventually an initial location, rotation, scale can be
+            # set here
+            retCode = bpy.ops.object.camera_add()
+            logger.info("obj.camera_add %r" % (retCode,))
+        except Exception as exc:
+            logger.error("add camera error", exc)
+
+        new_camera = bpy.context.active_object
+        configure_camera( new_camera )
+        
+        if placement_data["location"] is not None:
+            new_camera.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
+            
+        if placement_data["rotation"] is not None:
+            euler = Coordinates.camera_transform_angles_to_blender_euler( placement_data["rotation"] )
+            new_camera.rotation_mode = euler.order
+            new_camera.rotation_euler = euler
+
+            
+        # ensure the model is in the anno_collection; this is
+        # required for IIIF Manifest export
+        for col in new_camera.users_collection:
+            col.objects.unlink(new_camera)
+        anno_collection.objects.link(new_camera)
+        return new_camera
+
     
     def update_placement_from_target(self, target_data, placement_data):
         """
