@@ -11,6 +11,7 @@ from .initialize_collections import initialize_annotation, generate_uri
 
 from ..utils.blender_setup import configure_camera
 from ..utils.coordinates import Coordinates
+from ..utils.blender_naming import generate_name_from_id
 
 import logging
 logger = logging.getLogger("iiif.new_camera")
@@ -59,6 +60,8 @@ class NewCamera(Operator):
         annotation_collection=bpy.data.collections.new("Annotation")
         initialize_annotation( annotation_collection )    
         annotation_page_collection.children.link(annotation_collection) 
+        annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
+
                 
         for col in new_camera.users_collection:
             col.objects.unlink(new_camera)
