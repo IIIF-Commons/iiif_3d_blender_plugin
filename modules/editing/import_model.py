@@ -14,6 +14,8 @@ import math
 import json
 import logging
 
+from ..utils.blender_naming import generate_name_from_id
+
 logger = logging.getLogger("import-model")
 
 
@@ -102,7 +104,8 @@ class ImportModel(Operator, ImportHelper):
         annotation_collection=bpy.data.collections.new("Annotation")
         initialize_annotation( annotation_collection )    
         annotation_page_collection.children.link(annotation_collection) 
-        
+        annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
+
         if new_model.users_collection:
             for col in new_model.users_collection:
                 col.objects.unlink(new_model)
