@@ -7,7 +7,7 @@ from bpy.types import Context, Operator
 from bpy_extras.io_utils import ExportHelper
 
 from .metadata import IIIFMetadata
-from .utils.color import hex_to_rgba
+from .utils.color import rgba_to_hex
 from .utils.coordinates import Coordinates
 from .utils.json_patterns import (
     force_as_object,
@@ -17,6 +17,8 @@ from .utils.json_patterns import (
     create_axes_named_values,
     get_source_resource
 )
+
+from .utils.blender_setup import get_scene_background_color
 
 from . import navigation as nav
 
@@ -75,6 +77,13 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         
     def get_scene_data(self, scene_collection: bpy.types.Collection) -> dict:
         scene_data = self.get_base_data(scene_collection)
+        
+        backgroundColor = get_scene_background_color()
+        
+        if backgroundColor is not None:
+            color_hex = rgba_to_hex( backgroundColor )
+            logger.info("setting scene backgroundColor to %s" % color_hex)
+            scene_data["backgroundColor"] = color_hex
         
         for page_collection in nav.getAnnotationPages(scene_collection):
             scene_data["items"].append(self.get_annotation_page_data(page_collection))
