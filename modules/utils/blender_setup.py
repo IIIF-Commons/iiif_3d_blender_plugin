@@ -41,3 +41,35 @@ def configure_camera(cameraObj):
     # be the vertical angle in degrees,
     cameraObj.data.sensor_fit = 'VERTICAL'
     return
+    
+def set_scene_background_color(blenderColor):
+    """
+    scene here referring to the Blender scene
+    Sets the background color using the node-graph
+    
+    blenderColor a (4,) array of floats in range [0.0,1.0]
+    denoting red-green-blue-alpha color channel values
+    generally will have rgba[3] = 1.0; no transparency
+    """
+    bpy.context.scene.world.use_nodes = True
+    background_node = bpy.context.scene.world.node_tree.nodes["Background"]
+    background_node.inputs[0].default_value = blenderColor
+    return None
+    
+def get_scene_background_color():
+    """
+    scene here referring to the Blender scene
+    returns the background color using the node-graph
+    
+    returns a (4,) array of floats in range [0.0,1.0]
+    denoting red-green-blue-alpha color channel values
+    generally will have rgba[3] = 1.0; no transparency
+    """
+    if not bpy.context.scene.world.use_nodes:
+        return None
+    background_node = bpy.context.scene.world.node_tree.nodes["Background"]
+    retVal = background_node.inputs[0].default_value
+    return retVal
+
+    
+    
