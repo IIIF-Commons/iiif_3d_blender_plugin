@@ -20,7 +20,7 @@ from .utils.json_patterns import (
     axes_named_values,
 )
 
-from .utils.blender_setup import configure_camera
+from .utils.blender_setup import configure_camera,set_scene_background_color
 
 import math
 
@@ -458,11 +458,18 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             self.get_iiif_id_or_label(annotation_page_data), scene_collection
         )
         
+        page_collection["iiif_id"] = annotation_page_data.get("id")
+        page_collection["iiif_type"] = annotation_page_data.get("AnnotationPage")
+        
+        
+        
         for item in annotation_page_data.get("items", []):
             if item.get("type") == "Annotation":
                 self.process_annotation(item, page_collection)
+                annotation_page_data["items"].remove(item)
             else:
                 self.report({"WARNING"}, f"Unknown item type: {item.get('type')}")
+        page_collection["iiif_json"] = annotation_page_data
 
     def process_scene(self, scene_data: dict, manifest_collection) -> None:
         """Process annotation pages in a scene"""
@@ -474,18 +481,12 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         metadata = IIIFMetadata(scene_collection)
         metadata.store_scene(scene_data)
 
-        if "backgroundColor" in scene_data:
-            self.report(
-                {"DEBUG"}, f"Setting background color: {scene_data['backgroundColor']}"
-            )
-            try:
-                bpy.context.scene.world.use_nodes = True
-                background_node = bpy.context.scene.world.node_tree.nodes["Background"]
-                background_node.inputs[0].default_value = hex_to_rgba(
-                    scene_data["backgroundColor"]
-                )
-            except Exception as e:
-                self.report({"ERROR"}, f"Error setting background color: {e}")
+        bgColorHex = scene_data.get("backgroundColor", None)
+        if bgColorHex:            
+            bgColor=hex_to_rgba(bgColorHex)
+            logger.info("setting background color to %r, %s" % (bgColor, bgColorHex))
+            set_scene_background_color(bgColor)
+            del scene_data["backgroundColor"]
 
         scene_collection["iiif_id"] = scene_data["id"]
         scene_collection["iiif_type"] = "Scene"
