@@ -71,6 +71,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
     def get_manifest_data(self, manifest_collection: bpy.types.Collection) -> dict:
         manifest_data = self.get_base_data(manifest_collection)
         
+        manifest_data["items"] = manifest_data.get("items", None) or []
         for scene_collection in nav.getScenes(manifest_collection):
             manifest_data["items"].append(self.get_scene_data(scene_collection))
         return manifest_data
@@ -85,6 +86,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
             logger.info("setting scene backgroundColor to %s" % color_hex)
             scene_data["backgroundColor"] = color_hex
         
+        scene_data["items"] = scene_data.get("items", None) or []
         for page_collection in nav.getAnnotationPages(scene_collection):
             scene_data["items"].append(self.get_annotation_page_data(page_collection))
         return scene_data
@@ -93,6 +95,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
     def get_annotation_page_data(self, page_collection: bpy.types.Collection) -> dict:
         page_data = self.get_base_data(page_collection)
         
+        page_data["items"] = page_data.get("items", None) or []
         for anno_collection in nav.getAnnotations(page_collection):
             page_data["items"].append(self.get_annotation_data(anno_collection))
 
