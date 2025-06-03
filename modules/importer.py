@@ -19,6 +19,7 @@ from .utils.json_patterns import (
     force_as_list,
     axes_named_values,
 )
+from .editing.initialize_collections import generate_uri
 
 from .utils.blender_setup import configure_camera,set_scene_background_color
 
@@ -354,6 +355,11 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         self.import_model(temp_file)
         new_model = bpy.context.active_object
         
+        new_model["iiif_id"] = model_id
+        new_model["iiif_type"] = "Model"
+        new_model["iiif_json"] = json.dumps(resource_data)
+        
+        
         if placement_data["location"] is not None:
             new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
             
@@ -378,12 +384,10 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
     def resource_data_to_camera(self, resource_data, placement_data, anno_collection):
         """
-        download, create, and configure camera object
+        create, and configure camera object
         """
 
         try:
-            # developer note: eventually an initial location, rotation, scale can be
-            # set here
             retCode = bpy.ops.object.camera_add()
             logger.info("obj.camera_add %r" % (retCode,))
         except Exception as exc:
@@ -391,6 +395,15 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
 
         new_camera = bpy.context.active_object
         configure_camera( new_camera )
+        
+        if "fieldOfView" in resource_data:
+            foV = force_as_singleton(resource_data["fieldOfView"])
+            new_camera.data.angle_y = math.radians(foV)  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            del resource_data["fieldOfView"]
+            
+        new_camera["iiif_id"] = generate_uri("PerspectiveCamera")
+        new_camera["iiif_type"] = "PerspectiveCamera"
+        new_camera["iiif_json"] = json.dumps(resource_data)
         
         if placement_data["location"] is not None:
             new_camera.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
@@ -459,9 +472,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         )
         
         page_collection["iiif_id"] = annotation_page_data.get("id")
-        page_collection["iiif_type"] = annotation_page_data.get("AnnotationPage")
-        
-        
+        page_collection["iiif_type"] = "AnnotationPage"
         
         for item in annotation_page_data.get("items", []):
             if item.get("type") == "Annotation":
@@ -469,7 +480,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
                 annotation_page_data["items"].remove(item)
             else:
                 self.report({"WARNING"}, f"Unknown item type: {item.get('type')}")
-        page_collection["iiif_json"] = annotation_page_data
+        page_collection["iiif_json"] = json.dumps(annotation_page_data)
 
     def process_scene(self, scene_data: dict, manifest_collection) -> None:
         """Process annotation pages in a scene"""
