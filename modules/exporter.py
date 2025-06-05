@@ -104,7 +104,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
 
     def get_annotation_data(self, anno_collection ):
         anno_data = self.get_base_data(anno_collection)
-         
+        anno_data["motivation"] = ["painting"]
 #        Developer Note:
 #        The reason we need to pass the bodyObj into the function
 #        to create the target is that in the Prezi 4 API for Scenes,
