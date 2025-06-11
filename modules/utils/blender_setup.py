@@ -29,7 +29,7 @@ def configure_blender_scene():
         
         scene.render.resolution_x = resolutionX
         scene.render.resolution_y = resolutionY
-    
+    git 
     return 
     
 def configure_camera(cameraObj):
@@ -57,7 +57,7 @@ def is_manifest_defined_background_color():
     returns boolean if the _MANIFEST_DEFINED_BACKGROUND_COLOR
     custom property has been defined and defined to a True
     """
-    return bpy.context.scene[_MANIFEST_DEFINED_BACKGROUND_COLOR] or False
+    return bpy.context.scene.get(_MANIFEST_DEFINED_BACKGROUND_COLOR, None) or False
     
 def set_scene_background_color(blenderColor):
     """
