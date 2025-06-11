@@ -30,7 +30,6 @@ def configure_blender_scene():
         scene.render.resolution_x = resolutionX
         scene.render.resolution_y = resolutionY
     
-    logger.info("Scene resolution set to %i x %i" % (resolutionX,resolutionY))
     return 
     
 def configure_camera(cameraObj):
