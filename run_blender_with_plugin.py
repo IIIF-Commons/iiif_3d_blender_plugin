@@ -1,11 +1,12 @@
+import sys
+import os
+import bpy
+
 import logging
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-import sys
-import os
-import bpy
 
 # Ensure the script receives the correct number of arguments
 if len(sys.argv) < 4:

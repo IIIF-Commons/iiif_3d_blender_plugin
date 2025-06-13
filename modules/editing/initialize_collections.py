@@ -1,9 +1,10 @@
+import bpy
+import json
+
 import logging
 logger = logging.getLogger("iiif.initialize_collections")
 logger.setLevel(logging.INFO)
 
-import bpy
-import json
 
 
 def initialize_manifest( manifest_collection ):

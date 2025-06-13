@@ -1,8 +1,9 @@
+import bpy
+
 import logging
 logger = logging.getLogger("iiif.navigation")
 logger.setLevel(logging.INFO)
 
-import bpy
 
 
 
