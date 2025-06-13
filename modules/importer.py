@@ -302,7 +302,11 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         anno_collection["iiif_type"] = annotation_data["type"]
         anno_collection["iiif_json"] = json.dumps(annotation_data)
         
-        bodyObj = self.body_to_object(body_data, target_data, anno_collection )
+        # Developer note 13 Jun 2025
+        # the body_to_object function returns a Blender object which ia the model
+        # camera, or light; but at this revision  this object
+        # is not needed at this stage of the import
+        self.body_to_object(body_data, target_data, anno_collection )
         return
 
     def body_to_object(self, body_data : dict, target_data: dict, anno_collection:Collection) -> bpy.types.Object:
@@ -491,8 +495,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         scene_collection = self.create_or_get_collection(
             self.get_iiif_id_or_label(scene_data), manifest_collection
         )
-        context = bpy.context
-
+        
         metadata = IIIFMetadata(scene_collection)
         metadata.store_scene(scene_data)
 

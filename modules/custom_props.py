@@ -66,7 +66,6 @@ def draw(self, context, context_member, prop_type):
     del row
     layout.separator()
   
-    keys = obj.keys()
     for key in obj.keys():
         if not key.startswith("iiif_"):
             continue

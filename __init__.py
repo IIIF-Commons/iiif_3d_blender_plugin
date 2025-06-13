@@ -34,7 +34,6 @@ class OUTLINER_MT_edit_manifest(Menu):
     
     def draw(self,context):
         layout = self.layout
-        target_collection = context.collection
         layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
         layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
         layout.operator(NewCamera.bl_idname, text="Add Camera")
