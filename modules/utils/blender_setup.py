@@ -29,7 +29,6 @@ def configure_blender_scene():
         
         scene.render.resolution_x = resolutionX
         scene.render.resolution_y = resolutionY
-    git 
     return 
     
 def configure_camera(cameraObj):
