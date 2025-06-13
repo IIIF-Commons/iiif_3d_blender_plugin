@@ -5,12 +5,10 @@ from typing import Set
 
 import bpy
 from bpy.props import StringProperty
-from bpy.types import Collection, Context, Object, Operator
+from bpy.types import Context, Operator
 from bpy_extras.io_utils import ImportHelper
-from mathutils import Vector
 
 from .initialize_collections import initialize_annotation
-import math
 import json
 import logging
 

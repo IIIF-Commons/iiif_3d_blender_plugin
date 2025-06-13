@@ -6,16 +6,10 @@ from bpy.props import StringProperty
 from bpy.types import Context, Operator
 from bpy_extras.io_utils import ExportHelper
 
-from .metadata import IIIFMetadata
 from .utils.color import rgba_to_hex
 from .utils.coordinates import Coordinates
 from .utils.json_patterns import (
-    force_as_object,
-    force_as_singleton,
-    force_as_list,
-    axes_named_values,
-    create_axes_named_values,
-    get_source_resource
+    create_axes_named_values
 )
 
 from .utils.blender_setup import get_scene_background_color

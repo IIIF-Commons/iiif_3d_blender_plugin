@@ -49,7 +49,7 @@ def configure_camera(cameraObj):
     
 _MANIFEST_DEFINED_BACKGROUND_COLOR="manifest_defined_background_color"
 
-_USE_NODES_FOR_BACKGROUND_COLOR = False;
+_USE_NODES_FOR_BACKGROUND_COLOR = False
 
 def is_manifest_defined_background_color():
     """

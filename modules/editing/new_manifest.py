@@ -1,11 +1,7 @@
-from typing import Set
-import json
 
 import bpy
-from bpy.props import StringProperty
-from bpy.types import Context, Operator
+from bpy.types import Operator
 
-import math
 
 from .initialize_collections import initialize_manifest,initialize_scene,initialize_anotation_page
 
