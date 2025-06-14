@@ -40,7 +40,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
     )
 
 
-    def get_base_data(self, iiif_object):
+    def get_base_data(self, iiif_object) -> dict:
         """
         iiif_object is withe a Blender collection or Blender object
         for which custom properties iiif_id, iiif_type, and iiif_json
@@ -139,7 +139,8 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
     def resource_data_for_camera(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
         resource_data = self.get_base_data(blender_obj)
 
-        resource_data["fieldOfView"] =  math.degrees(blender_obj.data.angle_y)
+        foValue : float = float(blender_obj.data.angle_y) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+        resource_data["fieldOfView"] =  math.degrees(foValue) 
         return resource_data
         
     def resource_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
@@ -254,23 +255,26 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         ALWAYS_USE_POINTSELECTOR=False
          
         enclosing_scene=nav.getTargetScene(anno_collection)
-        scene_ref_data = {
-            "id" :   enclosing_scene.get("iiif_id"),
-            "type" : enclosing_scene.get("iiif_type")
-        }
-        
-        blender_location = blender_obj.location
-        iiif_position = Coordinates.blender_vector_to_iiif_position(blender_location)
-        
-        if iiif_position != (0.0,0.0,0.0) or ALWAYS_USE_POINTSELECTOR:
-            target_data = {
-            "type" : "SpecificResource",
-            "source" : scene_ref_data,
-            "selector" : create_axes_named_values("PointSelector", iiif_position)
+        if enclosing_scene is not None:
+            scene_ref_data = {
+                "id" :   enclosing_scene.get("iiif_id"),
+                "type" : enclosing_scene.get("iiif_type")
             }
+            
+            blender_location = blender_obj.location
+            iiif_position = Coordinates.blender_vector_to_iiif_position(blender_location)
+            
+            if iiif_position != (0.0,0.0,0.0) or ALWAYS_USE_POINTSELECTOR:
+                target_data = {
+                "type" : "SpecificResource",
+                "source" : scene_ref_data,
+                "selector" : create_axes_named_values("PointSelector", iiif_position)
+                }
+            else:
+                target_data = scene_ref_data
+            return target_data
         else:
-            target_data = scene_ref_data
-        return target_data
+            raise new Exception("enclosing scene not identified to for model target")
         
 
 

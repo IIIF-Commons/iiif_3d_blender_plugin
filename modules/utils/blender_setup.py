@@ -71,14 +71,15 @@ def set_scene_background_color(blenderColor):
     if _USE_NODES_FOR_BACKGROUND_COLOR:
         bpy.context.scene.world.use_nodes = True
         background_node = bpy.context.scene.world.node_tree.nodes["Background"]
-        background_node.inputs[0].default_value = blenderColor
+        if background_node is not None:
+            background_node.inputs[0].default_value = blenderColor
     else:
         bpy.context.scene.world.use_nodes = False
         bpy.context.scene.world.color = blenderColor[:3]
     bpy.context.scene[_MANIFEST_DEFINED_BACKGROUND_COLOR] = True
     return None
     
-def get_scene_background_color():
+def get_scene_background_color() -> tuple[float,float,float,float] | None :
     """
     scene here referring to the Blender scene
     returns the background color using the node-graph
@@ -89,11 +90,21 @@ def get_scene_background_color():
     """
     if not is_manifest_defined_background_color():
         return None
+
     if _USE_NODES_FOR_BACKGROUND_COLOR:
-        background_node = bpy.context.scene.world.node_tree.nodes["Background"]
-        return background_node.inputs[0].default_value
+        raw_color = bpy.context.scene.world.node_tree.nodes["Background"]?.inputs[0]?.default_value
     else:
-        return bpy.context.scene.world.color
+        raw_color = bpy.context.scene.world.color
+        
+    try:
+        raw_color_list = [float(x) for x in raw_color]
+        raw_color_list.extend([1.0] * 4)
+        return tuple(raw_color_list[:4])
+    except:
+        logger.warn("background raw color was not rgba format: %r" % (raw_color,))
+        return None
+        
+            
 
     
     

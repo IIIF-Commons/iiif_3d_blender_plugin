@@ -40,28 +40,29 @@ class NewCamera(Operator):
             return {"FINISHED"}
         
         new_camera = bpy.context.active_object
-        logger.info("new_camera: %r" % (new_camera,))
-        configure_camera(new_camera)
-        
-        # at this stage only support creating a PerspectiveCamera
-        # TODO will be to present a UI that will allow user to 
-        # choose what type of camera; and potentially a value for a label
-        new_camera.data.type = "PERSP"
-        
-        new_camera["iiif_id"]=  generate_uri("PerspectiveCamera")
-
-        new_camera['iiif_type']="PerspectiveCamera"
-        
-
-        annotation_collection=bpy.data.collections.new("Annotation")
-        initialize_annotation( annotation_collection )    
-        annotation_page_collection.children.link(annotation_collection) 
-        annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
-
-                
-        for col in new_camera.users_collection:
-            col.objects.unlink(new_camera)
-        annotation_collection.objects.link(new_camera)
+        if new_camera is not None:
+            logger.info("new_camera: %r" % (new_camera,))
+            configure_camera(new_camera)
+            
+            # at this stage only support creating a PerspectiveCamera
+            # TODO will be to present a UI that will allow user to 
+            # choose what type of camera; and potentially a value for a label
+            new_camera.data.type = "PERSP" # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+            
+            new_camera["iiif_id"]=  generate_uri("PerspectiveCamera")
+    
+            new_camera['iiif_type']="PerspectiveCamera"
+            
+    
+            annotation_collection=bpy.data.collections.new("Annotation")
+            initialize_annotation( annotation_collection )    
+            annotation_page_collection.children.link(annotation_collection) 
+            annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
+    
+                    
+            for col in new_camera.users_collection:
+                col.objects.unlink(new_camera)
+            annotation_collection.objects.link(new_camera)
         
         return {"FINISHED"}
 
