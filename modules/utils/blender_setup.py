@@ -92,7 +92,7 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
         return None
 
     if _USE_NODES_FOR_BACKGROUND_COLOR:
-        raw_color = bpy.context.scene.world.node_tree.nodes["Background"]?.inputs[0]?.default_value
+        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value
     else:
         raw_color = bpy.context.scene.world.color
         
@@ -100,7 +100,7 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
         raw_color_list = [float(x) for x in raw_color]
         raw_color_list.extend([1.0] * 4)
         return tuple(raw_color_list[:4])
-    except:
+    except Exception:
         logger.warn("background raw color was not rgba format: %r" % (raw_color,))
         return None
         

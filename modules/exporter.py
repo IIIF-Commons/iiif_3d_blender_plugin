@@ -274,7 +274,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
                 target_data = scene_ref_data
             return target_data
         else:
-            raise new Exception("enclosing scene not identified to for model target")
+            raise  Exception("enclosing scene not identified to for model target")
         
 
 
