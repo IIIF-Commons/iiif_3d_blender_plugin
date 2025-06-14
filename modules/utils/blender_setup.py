@@ -69,13 +69,13 @@ def set_scene_background_color(blenderColor):
     """
     
     if _USE_NODES_FOR_BACKGROUND_COLOR:
-        bpy.context.scene.world.use_nodes = True
-        background_node = bpy.context.scene.world.node_tree.nodes["Background"]
+        bpy.context.scene.world.use_nodes = True # pyright: ignore [reportOptionalMemberAccess]
+        background_node = bpy.context.scene.world.node_tree.nodes["Background"] # pyright: ignore [reportOptionalMemberAccess]
         if background_node is not None:
-            background_node.inputs[0].default_value = blenderColor
+            background_node.inputs[0].default_value = blenderColor # pyright: ignore [reportOptionalMemberAccess]
     else:
-        bpy.context.scene.world.use_nodes = False
-        bpy.context.scene.world.color = blenderColor[:3]
+        bpy.context.scene.world.use_nodes = False # pyright: ignore [reportOptionalMemberAccess]
+        bpy.context.scene.world.color = blenderColor[:3] # pyright: ignore [reportOptionalMemberAccess]
     bpy.context.scene[_MANIFEST_DEFINED_BACKGROUND_COLOR] = True
     return None
     
@@ -92,9 +92,9 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
         return None
 
     if _USE_NODES_FOR_BACKGROUND_COLOR:
-        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value
+        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value # pyright: ignore [reportOptionalMemberAccess]
     else:
-        raw_color = bpy.context.scene.world.color
+        raw_color = bpy.context.scene.world.color # pyright: ignore [reportOptionalMemberAccess]
         
     try:
         raw_color_list = [float(x) for x in raw_color]

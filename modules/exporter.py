@@ -108,9 +108,9 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
 #        is represented in the data for the Model
         bodyObj = nav.getBodyObject(anno_collection)
         
-        anno_data["target"] = self.target_data_for_object(bodyObj, anno_collection)
-        
-        anno_data["body"]= self.body_data_for_object(bodyObj, anno_collection)
+        if bodyObj is not None:
+            anno_data["target"] = self.target_data_for_object(bodyObj, anno_collection)
+            anno_data["body"]= self.body_data_for_object(bodyObj, anno_collection)
 
         return anno_data
 
@@ -146,15 +146,17 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
     def resource_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
         return self.get_base_data(blender_obj)
 
-    def specific_data_for_object(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ):
+    def specific_data_for_object(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
         resource_type = blender_obj.get("iiif_type")
         if resource_type == "Model":
             return self.specific_data_for_model(blender_obj, resource_data , anno_collection)
         elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
             return self.specific_data_for_camera(blender_obj, resource_data , anno_collection)
+        else:
+            raise Exception("unsupported type for specific_data_for_object %r " % (resource_type,))
             
         
-    def specific_data_for_model(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ):
+    def specific_data_for_model(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
         """
         """
         transforms = list()
@@ -205,7 +207,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
             
         return retVal
 
-    def specific_data_for_camera(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ):
+    def specific_data_for_camera(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict :
         """
         """
         transforms = list()
@@ -244,7 +246,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         if blender_obj.get("iiif_type", None) in ("Model","PerspectiveCamera"):
             return self.target_data_for_model(blender_obj, anno_collection )
         else:
-            self.warning("invalid object %r in target_data_for_object" % (blender_obj),)
+            logger.warning("invalid object %r in target_data_for_object" % (blender_obj),)
             return {}
         
     def target_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:

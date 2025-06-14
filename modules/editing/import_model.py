@@ -69,45 +69,46 @@ class ImportModel(Operator, ImportHelper):
         #    logging.getLogger('glTFImporter').setLevel(storedLevel)
         
         new_model = bpy.context.active_object
-        logger.info("new_model: %r" % (new_model,))
-        
-        if self.model_url:
-            iiif_id = self.model_url
-        else:
-            import pathlib
-            iiif_id = pathlib.Path(self.filepath).as_uri()
-        new_model["iiif_id"] = iiif_id
-        
-        import os.path
-        file_ext = os.path.splitext( self.filepath )[1].lower()
-        
-        ext_to_mime = {
-            ".glb" : "model/gltf-binary",
-            ".gltf": "model/gltf+json"
-        }
-        
-        model_format = ext_to_mime.get(file_ext, None)
-        
-        new_model_data = {
-            "id" : None,
-            "type" : None
-        }
-        if model_format:
-            new_model_data["format"] = model_format
-        
-        
-        new_model["iiif_json"] = json.dumps(new_model_data)
-        new_model["iiif_type"] = "Model"
-        
-        annotation_collection=bpy.data.collections.new("Annotation")
-        initialize_annotation( annotation_collection )    
-        annotation_page_collection.children.link(annotation_collection) 
-        annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
-
-        if new_model.users_collection:
-            for col in new_model.users_collection:
-                col.objects.unlink(new_model)
-        annotation_collection.objects.link(new_model)       
+        if new_model is not None:
+            logger.info("new_model: %r" % (new_model,))
+            
+            if self.model_url:
+                iiif_id = self.model_url
+            else:
+                import pathlib
+                iiif_id = pathlib.Path(self.filepath).as_uri()
+            new_model["iiif_id"] = iiif_id
+            
+            import os.path
+            file_ext = os.path.splitext( self.filepath )[1].lower()
+            
+            ext_to_mime = {
+                ".glb" : "model/gltf-binary",
+                ".gltf": "model/gltf+json"
+            }
+            
+            model_format = ext_to_mime.get(file_ext, None)
+            
+            new_model_data = {
+                "id" : None,
+                "type" : None
+            }
+            if model_format:
+                new_model_data["format"] = model_format
+            
+            
+            new_model["iiif_json"] = json.dumps(new_model_data)
+            new_model["iiif_type"] = "Model"
+            
+            annotation_collection=bpy.data.collections.new("Annotation")
+            initialize_annotation( annotation_collection )    
+            annotation_page_collection.children.link(annotation_collection) 
+            annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
+    
+            if new_model.users_collection is not None:
+                for col in new_model.users_collection:
+                    col.objects.unlink(new_model)
+            annotation_collection.objects.link(new_model)       
         
         
         return {"FINISHED"}
