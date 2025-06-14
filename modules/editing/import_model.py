@@ -132,6 +132,7 @@ class ImportNetworkModel(ImportModel, ImportHelper):
     
     def invoke(self, context, event):
         logger.info("ImportRemoteModel.invoke entered")
+        self.model_url=""
         rv = context.window_manager.invoke_props_dialog(self, width=640)
         logger.info("return from invoke_props_dialog %r : %r" % (rv, self.model_url) )
         return rv
