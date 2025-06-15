@@ -90,11 +90,11 @@ class ImportModel(Operator, ImportHelper):
             model_format = ext_to_mime.get(file_ext, None)
             
             new_model_data = {
-                "id" : None,
-                "type" : None
+                "id" : "",
+                "type" : ""
             }
-            if model_format:
-                new_model_data["format"] = model_format
+            if model_format is not None:
+                new_model_data["format"] = str(model_format)
             
             
             new_model["iiif_json"] = json.dumps(new_model_data)

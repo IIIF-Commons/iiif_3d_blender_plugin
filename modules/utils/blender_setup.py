@@ -4,6 +4,7 @@ authoring
 """
 
 import bpy
+import typing 
 
 import logging
 logger = logging.getLogger("iiif.blender_setup")
@@ -72,7 +73,7 @@ def set_scene_background_color(blenderColor):
         bpy.context.scene.world.use_nodes = True # pyright: ignore [reportOptionalMemberAccess]
         background_node = bpy.context.scene.world.node_tree.nodes["Background"] # pyright: ignore [reportOptionalMemberAccess]
         if background_node is not None:
-            background_node.inputs[0].default_value = blenderColor # pyright: ignore [reportOptionalMemberAccess]
+            background_node.inputs[0].default_value = blenderColor # pyright: ignore [reportAttributeAccessIssue]
     else:
         bpy.context.scene.world.use_nodes = False # pyright: ignore [reportOptionalMemberAccess]
         bpy.context.scene.world.color = blenderColor[:3] # pyright: ignore [reportOptionalMemberAccess]
@@ -92,14 +93,14 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
         return None
 
     if _USE_NODES_FOR_BACKGROUND_COLOR:
-        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value # pyright: ignore [reportOptionalMemberAccess]
+        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
     else:
         raw_color = bpy.context.scene.world.color # pyright: ignore [reportOptionalMemberAccess]
         
     try:
         raw_color_list = [float(x) for x in raw_color]
         raw_color_list.extend([1.0] * 4)
-        return tuple(raw_color_list[:4])
+        return typing.cast( tuple[float,float,float,float], tuple(raw_color_list)[:4])
     except Exception:
         logger.warn("background raw color was not rgba format: %r" % (raw_color,))
         return None
