@@ -65,7 +65,7 @@ if ext_name not in context.preferences.addons:
 
 
 try:
-    bpy.ops.import_scene.iiif_manifest(filepath=input_manifest)
+    bpy.ops.import_scene.iiif_manifest(filepath=input_manifest) #pyright: ignore [reportAttributeAccessIssue]
 except Exception as exc:
     print(str(exc))
     sys.exit(1)

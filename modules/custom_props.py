@@ -13,10 +13,11 @@ class AddIIIF3DObjProperties(Operator):
     def execute(self, context: Context) -> Set[str]:
         try:
             obj = context.view_layer.objects.active
-            if "iiif_annotation_id" not in obj:
-                obj["iiif_annotation_id"] = obj.name
-            if "iiif_source_url" not in obj:
-                obj["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
+            if obj is not None:
+                if "iiif_annotation_id" not in obj:
+                    obj["iiif_annotation_id"] = obj.name
+                if "iiif_source_url" not in obj:
+                    obj["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
 
             return {"FINISHED"}
         except Exception as e:
