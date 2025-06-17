@@ -1,15 +1,12 @@
+import sys
+import os
+import bpy
+
 import logging
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-import json
-import sys
-import os
-from typing import Any, Dict, List, Tuple, Callable
-import subprocess
-import bpy
-import difflib
 
 # Ensure the script receives the correct number of arguments
 if len(sys.argv) < 4:
@@ -68,7 +65,7 @@ if ext_name not in context.preferences.addons:
 
 
 try:
-    bpy.ops.import_scene.iiif_manifest(filepath=input_manifest)
+    bpy.ops.import_scene.iiif_manifest(filepath=input_manifest) #pyright: ignore [reportAttributeAccessIssue]
 except Exception as exc:
     print(str(exc))
     sys.exit(1)

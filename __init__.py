@@ -1,8 +1,12 @@
-from bpy.types import TOPBAR_MT_file_export, TOPBAR_MT_file_import
+from bpy.types import TOPBAR_MT_file_export, TOPBAR_MT_file_import,OUTLINER_MT_collection_new, OUTLINER_MT_collection , Menu
 from bpy.utils import register_class, unregister_class
 
 from .modules.exporter import ExportIIIF3DManifest
 from .modules.importer import ImportIIIF3DManifest
+from .modules.editing.import_model import ImportLocalModel, ImportNetworkModel
+from .modules.editing.new_manifest import NewManifest
+from .modules.editing.new_camera import NewCamera
+
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
     AddIIIF3DCollProperties,
@@ -15,14 +19,43 @@ from .modules.ui import (
     unregister_ui_properties,
 )
 
+import logging
+logger=logging.getLogger("iiif.init")
+
+
+class OUTLINER_MT_edit_manifest(Menu):
+    """
+    intent is that this menu will be added to the popup
+    menu associated with any Blender bpy.type.Collection
+    which has an iiif_type property value of AnnotationPage
+    """
+    bl_label="Manifest Editing"
+    bl_idname="OUTLINER_MT_edit_manifest"
+    
+    def draw(self,context):
+        layout = self.layout
+        layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
+        layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
+        layout.operator(NewCamera.bl_idname, text="Add Camera")
+
+def menu_func_manifest_submenu(self,context):
+    target_collection = context.collection
+    if target_collection.get("iiif_type","") == "AnnotationPage":
+        self.layout.menu(OUTLINER_MT_edit_manifest.bl_idname, text="Edit Manifest") 
+
 classes = (
     ImportIIIF3DManifest,
     ExportIIIF3DManifest,
+    ImportLocalModel,
+    ImportNetworkModel,
     IIIFManifestPanel,
     AddIIIF3DObjProperties,
     AddIIIF3DCollProperties,
     IIIF3DObjMetadataPanel,
-    IIIF3DCollMetadataPanel
+    IIIF3DCollMetadataPanel,
+    NewManifest,
+    NewCamera,
+    OUTLINER_MT_edit_manifest
 )
 
 def menu_func_import(self, context):
@@ -34,7 +67,13 @@ def menu_func_export(self, context):
     self.layout.operator(
         ExportIIIF3DManifest.bl_idname, text="IIIF 3D Manifest (.json)"
     )
-
+    
+    
+def menu_func_new_manifest(self, context):
+    self.layout.operator(
+        NewManifest.bl_idname, text="New IIIF Manifest"
+    )
+    
 def register():
     for cls in classes:
         register_class(cls)
@@ -43,10 +82,18 @@ def register():
 
     TOPBAR_MT_file_import.append(menu_func_import)
     TOPBAR_MT_file_export.append(menu_func_export)
+    
+    OUTLINER_MT_collection_new.append(menu_func_new_manifest)
+    
+    OUTLINER_MT_collection.append(menu_func_manifest_submenu)
 
 def unregister():
     TOPBAR_MT_file_import.remove(menu_func_import)
     TOPBAR_MT_file_export.remove(menu_func_export)
+    
+    OUTLINER_MT_collection_new.remove(menu_func_new_manifest)
+    
+    OUTLINER_MT_collection.append(menu_func_manifest_submenu)
 
     unregister_ui_properties()
 

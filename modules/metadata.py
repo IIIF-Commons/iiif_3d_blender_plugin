@@ -35,7 +35,7 @@ class IIIFMetadata:
         """Store complete manifest data"""
         self.obj[self._get_key("manifest")] = json.dumps(data)
         self.obj[self._get_key("import_date")] = datetime.now().isoformat()
-        self.obj[self._get_key("type")] = "manifest"
+        self.obj[self._get_key("type")] = "Manifest"
         self.obj[self._get_key("id")] = data.get("id","not_supplied")
 
     def store_annotation(self, data: Dict) -> None:
@@ -51,7 +51,7 @@ class IIIFMetadata:
     def store_scene(self, data: Dict) -> None:
         """Store scene data"""
         self.obj[self._get_key("scene")] = json.dumps(data)
-        self.obj[self._get_key("type")] = "scene"
+        self.obj[self._get_key("type")] = "Scene"
         if "id" in data:
             self.obj[self._get_key("id")] = data.get("id","not_supplied")
 

@@ -201,7 +201,7 @@ class Coordinates:
     def convert_to_vector(coords: dict | tuple[float, float, float] | Vector) -> Vector:
         if isinstance(coords, dict):
             return Coordinates.get_iiif_coords_from_pointselector(coords)
-        elif type(coords) == type( () ) and len(coords) == 3:            
+        elif type(coords) is type( () ) and len(coords) == 3:            
             return Vector( typing.cast( tuple, coords ) )
         else:
             return typing.cast(Vector, coords)

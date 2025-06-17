@@ -6,22 +6,20 @@ from bpy.props import StringProperty
 from bpy.types import Context, Operator
 from bpy_extras.io_utils import ExportHelper
 
-from .metadata import IIIFMetadata
-from .utils.color import hex_to_rgba
+from .utils.color import rgba_to_hex
 from .utils.coordinates import Coordinates
 from .utils.json_patterns import (
-    force_as_object,
-    force_as_singleton,
-    force_as_list,
-    axes_named_values,
-    create_axes_named_values,
-    get_source_resource
+    create_axes_named_values
 )
+
+from .utils.blender_setup import get_scene_background_color
+
+from . import navigation as nav
 
 import math
 
 import logging
-logger = logging.getLogger("export")
+logger = logging.getLogger("iiif.export")
 
 class ExportIIIF3DManifest(Operator, ExportHelper):
     """Export IIIF 3D Manifest"""
@@ -41,281 +39,262 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         subtype='FILE_PATH',
     )
 
-    def get_scene_data(self, context: Context, collection: bpy.types.Collection) -> dict | None:
-        """Get scene data from metadata or create new
-           Collection should be the Blender Collection corresponding to the IIIF Scene
+
+    def get_base_data(self, iiif_object) -> dict:
         """
-        # sanity check
-        iiif_type = collection.get("iiif_type", None)
-        if  iiif_type == "scene":
-            scene_id = collection.get("iiif_id",None)
-            if not scene_id:
-                logger.warning("invalid id for exporting scene %r" % (scene_id,))
-            else:
-                logger.info("creating json data for IIIF scene %s" % scene_id )
+        iiif_object is withe a Blender collection or Blender object
+        for which custom properties iiif_id, iiif_type, and iiif_json
+        have been defined. Returns a python dict which contains information
+        for the json output in Manifest.
+        
+        Design intent is that client will start with this base_data dict
+        and then add and or modify properties which are determined by
+        the Blender data structure
+        """
+        import json
+        base_json = iiif_object.get("iiif_json",None)
+        if base_json:
+            base_data = json.loads( base_json )
         else:
-            logger.warning("invalid collection passed to get_scene_data : %r" % (iiif_type,))
+            base_data = dict()
             
-        metadata = IIIFMetadata(collection)
-        scene_data = metadata.get_scene()
+        base_data["id"] = iiif_object.get("iiif_id")
+        base_data["type"] = iiif_object.get("iiif_type")
+        return base_data
+
+    def get_manifest_data(self, manifest_collection: bpy.types.Collection) -> dict:
+        manifest_data = self.get_base_data(manifest_collection)
         
+        manifest_data["items"] = manifest_data.get("items", None) or []
+        for scene_collection in nav.getScenes(manifest_collection):
+            manifest_data["items"].append(self.get_scene_data(scene_collection))
+        return manifest_data
         
+    def get_scene_data(self, scene_collection: bpy.types.Collection) -> dict:
+        scene_data = self.get_base_data(scene_collection)
+        
+        backgroundColor = get_scene_background_color()
+        
+        if backgroundColor is not None:
+            color_hex = rgba_to_hex( backgroundColor )
+            logger.info("setting scene backgroundColor to %s" % color_hex)
+            scene_data["backgroundColor"] = color_hex
+        
+        scene_data["items"] = scene_data.get("items", None) or []
+        for page_collection in nav.getAnnotationPages(scene_collection):
+            scene_data["items"].append(self.get_annotation_page_data(page_collection))
+        return scene_data
 
-        if scene_data:
-            # Only update background color if it was originally present
-            if "backgroundColor" in scene_data and context.scene.world and context.scene.world.use_nodes:
-                background_node = context.scene.world.node_tree.nodes.get("Background")
-                if background_node:
-                    color = background_node.inputs[0].default_value
-                    scene_data["backgroundColor"] = rgba_to_hex(color)
 
-            # Replace existing annotation page or add new one
-            annotation_page = self.get_annotation_page(scene_data, collection)
+    def get_annotation_page_data(self, page_collection: bpy.types.Collection) -> dict:
+        page_data = self.get_base_data(page_collection)
+        
+        page_data["items"] = page_data.get("items", None) or []
+        for anno_collection in nav.getAnnotations(page_collection):
+            page_data["items"].append(self.get_annotation_data(anno_collection))
 
-            # Replace or add items array
-            if 'items' not in scene_data:
-                scene_data['items'] = []
+        
+        return page_data
 
-            # Update existing annotation page or add new one
-            found = False
-            for i, item in enumerate(scene_data['items']):
-                if item.get('type') == 'AnnotationPage':
-                    scene_data['items'][i] = annotation_page
-                    found = True
-                    break
+    def get_annotation_data(self, anno_collection ):
+        anno_data = self.get_base_data(anno_collection)
+        anno_data["motivation"] = ["painting"]
+#        Developer Note:
+#        The reason we need to pass the bodyObj into the function
+#        to create the target is that in the Prezi 4 API for Scenes,
+#        the location of the model in the Scene is represented by
+#        a PointSelector-based SpecificResource considered to be
+#        a refinement of the target Scene. But in Blender, the location
+#        is represented in the data for the Model
+        bodyObj = nav.getBodyObject(anno_collection)
+        
+        if bodyObj is not None:
+            anno_data["target"] = self.target_data_for_object(bodyObj, anno_collection)
+            anno_data["body"]= self.body_data_for_object(bodyObj, anno_collection)
 
-            if not found:
-                scene_data['items'].append(annotation_page)
+        return anno_data
 
-            return scene_data
-        return None
 
-    def get_manifest_data(self, context: Context) -> dict:
-        """Get manifest data from metadata or create new"""
-        scene = context.scene
 
-        # Fallback to new manifest
-        fallback_manifest = {
-            "@context": "http://iiif.io/api/presentation/4/context.json",
-            "id": getattr(scene, "iiif_manifest_id"),
-            "type": "Manifest",
-            "label": {"en": [getattr(scene, "iiif_manifest_label")]},
-            "summary": {"en": [getattr(scene, "iiif_manifest_summary")]},
-            "items": []
-        }
+    def body_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        resource_data = self.resource_data_for_object(blender_obj, anno_collection)
+        return self.specific_data_for_object(blender_obj, resource_data, anno_collection)
 
-        for collection in bpy.data.collections:
-            metadata = IIIFMetadata(collection)
-            manifest_data = metadata.get_manifest()
-            if manifest_data:
-                # Merge existing manifest on top of fallback manifest
-                merged_manifest = {**fallback_manifest, **manifest_data}
-                merged_manifest["items"] = []  # Clear items to rebuild
-                merged_manifest["id"] = getattr(scene, "iiif_manifest_id")
-                merged_manifest["label"] = {
-                    **merged_manifest["label"],
-                    "en": [getattr(scene, "iiif_manifest_label")]
-                }
-                merged_manifest["summary"] = {
-                    **merged_manifest["summary"],
-                    "en": [getattr(scene, "iiif_manifest_summary")]
-                }
-                return merged_manifest
-
-        return fallback_manifest
-
-    def get_light_annotation(self, obj: bpy.types.Object) -> dict:
-        """Get annotation data for a light object"""
-        light = obj.data
-
-        # Use original IDs if available
-        annotation_id = obj.get('original_annotation_id', f"https://example.org/iiif/3d/light_{obj.name}")
-        body_id = obj.get('original_body_id', f"https://example.org/iiif/3d/lights/{obj.name}")
-
-        if light.type == 'SUN':
-            light_type = 'DirectionalLight'
+    def resource_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        """
+        returns the IIIF data for a Model, Camera, Light that is not position or orientation
+        description; this would be the body data if no Transform were needed for orientation
+        and scale.
+        """
+        resource_type = blender_obj.get("iiif_type")
+        logger.info("getting resource data for %s" % resource_type)
+        if resource_type == "Model":
+            return self.resource_data_for_model(blender_obj, anno_collection)
+        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
+            return self.resource_data_for_camera(blender_obj, anno_collection)
         else:
-            light_type = 'AmbientLight'
+            logger.error("type %s unsupported for export" % resource_type )
+            return {}
 
-        annotation = {
-            "id": annotation_id,
-            "type": "Annotation",
-            "motivation": ["painting"],
-            "body": {
-                "id": body_id,
-                "type": light_type,
-                "label": {"en": [obj.name]},
-            }
-        }
+    def resource_data_for_camera(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        resource_data = self.get_base_data(blender_obj)
 
-        # Add color if not default
-        if obj.get('original_color'):
-            annotation["body"]["color"] = rgba_to_hex((*light.color, 1.0)).upper()  # Force uppercase for hex values
-
-        # Add intensity if not default
-        original_intensity = obj.get('original_intensity')
-        if original_intensity:
-            try:
-                annotation["body"]["intensity"] = json.loads(original_intensity)
-            except json.JSONDecodeError:
-                self.report({'WARNING'}, f"Could not decode intensity data for {obj.name}")
-
-        original_lookAt = obj.get('original_lookAt')
-        if original_lookAt:
-            try:
-                annotation["body"]["lookAt"] = json.loads(original_lookAt)
-            except json.JSONDecodeError:
-                self.report({'WARNING'}, f"Could not decode lookAt data for {obj.name}")
-
-        original_target = obj.get('original_target')
-        if original_target:
-            try:
-                annotation["target"] = json.loads(original_target)
-            except json.JSONDecodeError:
-                self.report({'WARNING'}, f"Could not decode target data for {obj.name}")
-
-        return annotation
-
-    def get_model_annotation(self, obj: bpy.types.Object) -> dict:
-        """Get annotation data from metadata or create new"""
-        metadata = IIIFMetadata(obj)
-        annotation_data = metadata.get_annotation()
-
-        if annotation_data:
-            return annotation_data
-
-        # Fall back to new annotation
-        return {
-            "id": f"https://example.org/iiif/3d/anno_{obj.name}",
-            "type": "Annotation",
-            "motivation": ["painting"],
-            "body": {
-                "id": obj.get('iiif_source_url', f"local://models/{obj.name}"),
-                "type": "Model"
-            },
-            "target": "https://example.org/iiif/scene1/page/p1/1"
-        }
+        foValue : float = float(blender_obj.data.angle_y) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+        resource_data["fieldOfView"] =  math.degrees(foValue) 
+        return resource_data
         
-    def new_camera_annotation(self, blender_camera: bpy.types.Object ) -> dict:
-        camera_data = {
-            "id" : f"https://example.org/iiif/3d/camera_{blender_camera.name}",
-            "type" : "PerspectiveCamera"
-        }
-        
-        annotation_data = {
-            "id" : f"https://example.org/iiif/3d/anno_{blender_camera.name}",
-            "type" : "Annotation",
-            "motivation" : ["painting"],            
-        }
-        
-        annotation_data["target"] = {
-            "id" : "https://example.org/iiif/scene1/page/p1/1",
-            "type" : "Scene"
-        }
-        
-        annotation_data["body"] = camera_data
-        return annotation_data
-        
-    def get_camera_annotation(self, blender_camera: bpy.types.Object, scene_collection: bpy.types.Collection ) -> dict:
-        """Get annotation data from metadata or create new"""
-        metadata = IIIFMetadata(blender_camera)
-        annotation_data = metadata.get_annotation()
-        
-        if annotation_data is None:
-            annotation_data = self.new_camera_annotation(blender_camera)
-        
+    def resource_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        return self.get_base_data(blender_obj)
 
+    def specific_data_for_object(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
+        resource_type = blender_obj.get("iiif_type")
+        if resource_type == "Model":
+            return self.specific_data_for_model(blender_obj, resource_data , anno_collection)
+        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
+            return self.specific_data_for_camera(blender_obj, resource_data , anno_collection)
+        else:
+            raise Exception("unsupported type for specific_data_for_object %r " % (resource_type,))
+            
+        
+    def specific_data_for_model(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
+        """
+        """
+        transforms = list()
+        saved_mode = blender_obj.rotation_mode
         try:
-            saved_mode = blender_camera.rotation_mode
-            blender_camera.rotation_mode = "QUATERNION"
-            quat = blender_camera.rotation_quaternion
-            blender_camera.rotation_mode = saved_mode
-            vec  = blender_camera.location
+            blender_obj.rotation_mode = "QUATERNION"
+            quat = blender_obj.rotation_quaternion
+            # the angle property can be used to decide if this is,
+            # essentially a 0-rotation, to within sensible precision
+            abs_angle = abs(quat.angle)
             
-            iiif_rotation = Coordinates.blender_rotation_to_camera_transform_angles(quat)
-            iiif_position = Coordinates.blender_vector_to_iiif_position(vec)
-            logger.info("iiif: position: %r  rotation %r" % (iiif_position, iiif_rotation ))
-        except Exception as exc:
-            logger.exception("failed camera ", exc)
-
-        target = force_as_object(force_as_singleton(annotation_data.get("target")))
-        target_source = get_source_resource( target )
-        target_source["id"] = scene_collection.get("iiif_id", "https://example.com/not_available")
+            if abs_angle > 1.0e-5:
+                iiif_rotation = Coordinates.blender_rotation_to_model_transform_angles(quat)
+                transforms.append(
+                    create_axes_named_values("RotateTransform", iiif_rotation)
+                )
+        finally:
+            blender_obj.rotation_mode = saved_mode
         
-        body = force_as_singleton(annotation_data.get("body"))
-        iiif_camera = get_source_resource( body )
+        blender_scale = blender_obj.scale.to_tuple() # this is a (3,) tuple
+        is_uniform_scaling = True
+        uniform_scale = blender_scale[0]
+        # for now we warn on non-uniform scaling
+        for s in blender_scale[1:3]:
+            if s != uniform_scale:
+                logger.warning("non-uniform scaling %s for model" % (blender_scale,))
+                is_uniform_scaling = False
+                break
+        # non-uniform scaling is wta
+        # problematic if there are rotations involved,
+        # but this is as good as we can get to convert to iiif-Coordinates
+        iiif_scale = ( blender_scale[0], blender_scale[2], blender_scale[1] )
         
-        # this will remove a camera "lookAt" property if it exists
-        old_lookAt = iiif_camera.pop("lookAt", None)
+        if not ( is_uniform_scaling and uniform_scale == 1 ):
+            transforms.append(
+                create_axes_named_values("ScaleTransform", iiif_scale)
+            )
+            
+         
+        if transforms:
+            retVal = {
+                "type" : "SpecificResource",
+                "source" : resource_data,
+                "transform" : transforms
+            }
+        else:
+            retVal = resource_data
+            
+        return retVal
+
+    def specific_data_for_camera(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict :
+        """
+        """
+        transforms = list()
+        saved_mode = blender_obj.rotation_mode
+        try:
+            blender_obj.rotation_mode = "QUATERNION"
+            quat = blender_obj.rotation_quaternion
+            # the angle property can be used to decide if this is,
+            # essentially a 0-rotation, to within sensible precision
+            abs_angle = abs(quat.angle)
+            
+            if abs_angle > 1.0e-5:
+                iiif_rotation = Coordinates.blender_rotation_to_camera_transform_angles(quat)
+                transforms.append(
+                    create_axes_named_values("RotateTransform", iiif_rotation)
+                )
+        finally:
+            blender_obj.rotation_mode = saved_mode
+            
+         
+        if transforms:
+            retVal = {
+                "type" : "SpecificResource",
+                "source" : resource_data,
+                "transform" : transforms
+            }
+        else:
+            retVal = resource_data
+            
+        logger.info("returning body for camera: %r" % retVal)
+        return retVal
         
-        blender_y_angle = blender_camera.data.angle_y
-        logger.info("blender vertical FoV %.3e radians" % blender_y_angle)
-        iiif_camera["fieldOfView"] =  math.degrees(blender_y_angle)
         
-        annotation_data["body"] = {
-            "type" : "SpecificResource",
-            "source" : iiif_camera,
-            "transform" : [create_axes_named_values("RotateTransform", iiif_rotation)]
-        }
-             
-        annotation_data["target"]= {
-            "type" : "SpecificResource",
-            "source" : target_source,
-            "selector" : create_axes_named_values("PointSelector", iiif_position)
-        }           
+        
+    def target_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        if blender_obj.get("iiif_type", None) in ("Model","PerspectiveCamera"):
+            return self.target_data_for_model(blender_obj, anno_collection )
+        else:
+            logger.warning("invalid object %r in target_data_for_object" % (blender_obj),)
+            return {}
+        
+    def target_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+        """
+        Examines the Blender "location" of the blender_obj and returns a SpecificResource data
+        with a PointSelector and source of the enclosing scene
+        """  
+        ALWAYS_USE_POINTSELECTOR=False
+         
+        enclosing_scene=nav.getTargetScene(anno_collection)
+        if enclosing_scene is not None:
+            scene_ref_data = {
+                "id" :   enclosing_scene.get("iiif_id"),
+                "type" : enclosing_scene.get("iiif_type")
+            }
+            
+            blender_location = blender_obj.location
+            iiif_position = Coordinates.blender_vector_to_iiif_position(blender_location)
+            
+            if iiif_position != (0.0,0.0,0.0) or ALWAYS_USE_POINTSELECTOR:
+                target_data = {
+                "type" : "SpecificResource",
+                "source" : scene_ref_data,
+                "selector" : create_axes_named_values("PointSelector", iiif_position)
+                }
+            else:
+                target_data = scene_ref_data
+            return target_data
+        else:
+            raise  Exception("enclosing scene not identified to for model target")
+        
 
-        return annotation_data
 
-    def get_annotation_page(self, scene_data: dict, scene_collection: bpy.types.Collection) -> dict:
-        """Build annotation page for a scene"""
-        # Get the first annotation page from scene data if it exists
-        existing_pages = [item for item in scene_data.get('items', [])
-                         if item.get('type') == 'AnnotationPage']
-
-        page_id = (existing_pages[0].get('id') if existing_pages
-                   else f"{scene_data['id']}/annotations")
-
-        annotation_page = {
-            "id": page_id,
-            "type": "AnnotationPage",
-            "items": []
-        }
-
-        # Look for objects in the collection and its children
-        def process_collection(col):
-            for obj in col.objects:
-                if obj.type == 'MESH':
-                    metadata = IIIFMetadata(obj)
-                    anno_data = metadata.get_annotation()
-                    if anno_data:
-                        annotation_page["items"].append(anno_data)
-                elif obj.type == 'LIGHT':
-                    annotation_page["items"].append(self.get_light_annotation(obj))
-                elif obj.type == 'CAMERA':
-                    anno_data = self.get_camera_annotation(obj, scene_collection)
-                    if anno_data:
-                        annotation_page["items"].append(anno_data)
-
-            # Process child collections recursively
-            for child in col.children:
-                process_collection(child)
-
-        process_collection(scene_collection)
-        return annotation_page
 
     def execute(self, context: Context) -> Set[str]:
-        """Export scene as IIIF manifest"""
-        manifest_data = self.get_manifest_data(context)
-
-        # Process scenes
-        for collection in bpy.data.collections:            
-            if collection.get("iiif_type",None) == "scene":
-                scene_data = self.get_scene_data(context, collection)
-                if scene_data:
-                    manifest_data["items"].append(scene_data)
-
-        # Write manifest
-        with open(self.filepath, "w", encoding="utf-8") as f:
-            json.dump(manifest_data, f, indent=2)
+        """Export Blender scene as IIIF manifest"""
+        manifests = nav.getManifests()
+        
+        if manifests:   # that is, not an empty list
+            if len(manifests) > 1:
+                logger.warning("Multiple manifests not supported")
+            manifest_collection=manifests[0]
+            manifest_data = self.get_manifest_data(manifest_collection)
+        
+            # Write manifest
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump(manifest_data, f, indent=2)
+        else:
+            logger.warning("No manifest collections identified")
 
         return {"FINISHED"}
