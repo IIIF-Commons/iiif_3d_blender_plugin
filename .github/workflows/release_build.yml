@@ -73,6 +73,7 @@ jobs:
         run: |
           mkdir dist ; 
           blender --command extension build --output-dir /tmp;
+          zipinfo /tmp/blender_iiif_3d_plugin-0.2.10.zip;
           unzip /tmp/*.zip -d dist 
 
       - name: Archive production artifacts
