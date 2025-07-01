@@ -9,9 +9,13 @@ jobs:
   build-and-upload:
     runs-on: ubuntu-latest
 
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set version from release
+        run: echo "VERSION=0.2.11" >> $GITHUB_ENV
+        # run: echo "VERSION=${{ github.event.release.tag_name && github.event.release.tag_name.startsWith('v') && github.event.release.tag_name != 'v' && github.event.release.tag_name[1:] || github.event.release.tag_name }}" >> $GITHUB_ENV
+        
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -71,13 +75,17 @@ jobs:
 
       - name: Build plugin
         run: |
-          mkdir dist ; 
+          # Update the version in blender_manifest.toml
+          sed -i "s/^version[ ]*=.*$/version=$VERSION/g" blender_manifest.toml
           blender --command extension build --output-dir /tmp;
-          zipinfo /tmp/blender_iiif_3d_plugin-0.2.10.zip;
+          # Because the upload artifact zips the directory
+          # we need to unzip the contents to allow the artifact
+          # process to re-zip
+          mkdir dist ; 
           unzip /tmp/*.zip -d dist 
 
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: blender_iiif_3d_plugin-0.2.10
+          name: blender_iiif_3d_plugin-${{ env.VERSION }}
           path: dist
