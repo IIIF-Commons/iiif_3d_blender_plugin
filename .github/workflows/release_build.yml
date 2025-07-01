@@ -71,10 +71,12 @@ jobs:
 
       - name: Build plugin
         run: |
-          mkdir dist ; blender --command extension build --output-dir dist    
+          mkdir dist ; 
+          blender --command extension build --output-dir /tmp;
+          unzip /tmp/*.zip -d dist 
 
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
         with:
           name: blender_iiif_3d_plugin-0.2.10
-          path: dist/blender_iiif_3d_plugin-0.2.10.zip
+          path: dist
