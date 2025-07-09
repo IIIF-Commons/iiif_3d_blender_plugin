@@ -2,8 +2,18 @@ import bpy
 import json
 
 import logging
-logger = logging.getLogger("iiif.initialize_collections")
+logger = logging.getLogger("iiif.collections")
 logger.setLevel(logging.INFO)
+
+# Developer note 
+# The name of this module, collections, is intended to refer to the
+# Blender concept of the a collection which in Blender provides a 
+# grouping structure to the objects in a scene but does not itself 
+# play a role in rendering. 
+# 
+# A Blender collection is used to implement the IIIF resources
+# Manifest, Scene, AnnotationPage, and Annotation
+
 
 
 
@@ -100,21 +110,3 @@ def initialize_annotation( annotation_collection ):
     annotation_collection["iiif_json"] = json.dumps(anno_init_data)
  
     
-def generate_uri(resource_type="Manifest"):
-    """
-    this is the stub for a future implementation that will 
-    generate a more useful valid , globally unique, and publically
-    accessible URI 
-    """
-    import re
-    prefix = "https://example.com/iiif_blender_plugin/%s/" % resource_type.lower()
-    re_pattern= re.compile( prefix+r"([0-9]+)\s*$" )
-    imax=0
-    for obj_or_col in ( list(bpy.data.objects) + list(bpy.data.collections) ):
-        match = re_pattern.match( obj_or_col.get("iiif_id", ""))
-        if match:
-            val = int( match.group(1) )
-            
-            imax = max(imax,val)
-    retVal = prefix + str(imax+1)
-    return retVal
