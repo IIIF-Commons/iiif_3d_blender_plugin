@@ -1,29 +1,30 @@
-import datetime
+
 import json
-import os
-import urllib.request
 from typing import Set
 
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Collection, Context, Object, Operator
 from bpy_extras.io_utils import ImportHelper
-from mathutils import Vector
 
-from .metadata import IIIFMetadata
+from .editing.collections import (  new_manifest,
+                                    new_scene,
+                                    new_annotation_page,
+                                    new_annotation,
+                                    ANNOTATION_TYPE,
+                                    ANNOTATIONPAGE_TYPE,
+                                    SCENE_TYPE)
+
 from .utils.color import hex_to_rgba
-from .utils.coordinates import Coordinates
 from .utils.json_patterns import (
     force_as_object,
     force_as_singleton,
     force_as_list,
     axes_named_values,
 )
-from .editing.initialize_collections import generate_uri
 
-from .utils.blender_setup import configure_camera,set_scene_background_color
 
-import math
+from .utils.blender_setup import set_scene_background_color
 
 import logging
 
@@ -60,48 +61,30 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             with open(self.filepath, "r", encoding="utf-8") as f:
                 self.manifest_data = json.load(f)
 
-            self.report({"DEBUG"}, f"Successfully read manifest from {self.filepath}")
-            self.report({"DEBUG"}, f"Manifest data: {self.manifest_data}")
             self.process_manifest(self.manifest_data)
-            self.report(
-                {"DEBUG"}, f"Successfully imported manifest from {self.filepath}"
-            )
-
             return {"FINISHED"}
         except Exception as e:
-            import traceback
-
             self.report({"ERROR"}, f"Error reading manifest: {str(e)}")
-            traceback.print_exc()
             return {"CANCELLED"}
 
     def process_manifest(self, manifest_data: dict) -> None:
         """Process the manifest data and import the model"""
 
         # Store manifest metadata on the main scene collection
-        main_collection = self.create_or_get_collection("IIIF Manifest")
-        metadata = IIIFMetadata(main_collection)
-        metadata.store_manifest(manifest_data)
-        
-        main_collection["iiif_id"] = manifest_data["id"]
-        main_collection["iiif_type"] = "Manifest"
+        main_collection = new_manifest( manifest_data )
+        bpy.context.scene.collection.children.link(main_collection)
 
         if "items" in manifest_data:
             for item in manifest_data["items"][:]: # iterate over a copy
-                if item.get("type",None) == "Scene":
+                if item.get("type",None) == SCENE_TYPE:
                     self.process_scene(item, main_collection)
                     manifest_data["items"].remove(item)
 
         main_collection["iiif_json"] = json.dumps(manifest_data)            
 
-    def process_scene(self, scene_data: dict, manifest_collection) -> None:
+    def process_scene(self, scene_data: dict, manifest_collection : Collection) -> None:
         """Process annotation pages in a scene"""
-        scene_collection = self.create_or_get_collection(
-            self.get_iiif_id_or_label(scene_data), manifest_collection
-        )
-        
-        metadata = IIIFMetadata(scene_collection)
-        metadata.store_scene(scene_data)
+        scene_collection = new_scene( scene_data)
 
         bgColorHex = scene_data.get("backgroundColor", None)
         if bgColorHex:            
@@ -109,13 +92,10 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             logger.info("setting background color to %r, %s" % (bgColor, bgColorHex))
             set_scene_background_color(bgColor)
             del scene_data["backgroundColor"]
-
-        scene_collection["iiif_id"] = scene_data["id"]
-        scene_collection["iiif_type"] = "Scene"
         
         if "items" in scene_data:
             for item in scene_data.get("items", [])[:]:
-                if item.get("type") == "AnnotationPage":
+                if item.get("type") == ANNOTATIONPAGE_TYPE:
                     self.process_annotation_page(item, scene_collection)
                     scene_data["items"].remove(item)
         scene_collection["iiif_json"] = json.dumps( scene_data )
@@ -123,17 +103,12 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
     def process_annotation_page(
         self, annotation_page_data: dict, scene_collection: Collection
     ) -> None:
-        page_collection = self.create_or_get_collection(
-            self.get_iiif_id_or_label(annotation_page_data), scene_collection
-        )
-        
-        page_collection["iiif_id"] = annotation_page_data.get("id")
-        page_collection["iiif_type"] = "AnnotationPage"
-        
+        page_collection = new_annotation_page( annotation_page_data )
+                
         # note in following loop the loop is over a copy
         # of the items list, generated by the [:] indexing
         for item in annotation_page_data.get("items", [])[:]:
-            if item.get("type") == "Annotation":
+            if item.get("type") == ANNOTATION_TYPE:
                 self.process_annotation(item, page_collection)
                 annotation_page_data["items"].remove(item)
             else:
@@ -143,7 +118,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
     def process_annotation(
         self, annotation_data: dict, parent_collection: Collection
     ) -> None:
-        logger.debug("processing annotation %s" % annotation_data["id"])
+
         target_data =  force_as_object(
             force_as_singleton(annotation_data.get("target", None)), default_type="Scene"
         )
@@ -165,68 +140,49 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
                     "annotation %s has no body property" % annotation_data["id"]
                 )
                 
-        anno_collection = self.create_or_get_collection(annotation_data["id"], parent_collection)
-        anno_collection["iiif_id"]   = annotation_data["id"]
-        anno_collection["iiif_type"] = annotation_data["type"]
+        anno_collection = new_annotation( annotation_data )
+        parent_collection.children.link(anno_collection)
+        
+        
         anno_collection["iiif_json"] = json.dumps(annotation_data)
         
         # Developer note 13 Jun 2025
         # the body_to_object function returns a Blender object which ia the model
         # camera, or light; but at this revision  this object
         # is not needed at this stage of the import
-        self.body_to_object(body_data, target_data, anno_collection )
+        self.body_to_object(body_data, target_data )
         return
                     
-    def download_model(self, url: str) -> str:
-        """Download the model file from the given URL"""
-        temp_dir = bpy.app.tempdir
-        time_string = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        model_name = os.path.basename(url)
-        model_extension = os.path.splitext(model_name)[1]
-        temp_file = os.path.join(
-            temp_dir, f"temp_model_{time_string}_{model_name}{model_extension}"
-        )
-
-        try:
-            self.report({"DEBUG"}, f"Downloading model from {url} to {temp_file}")
-            urllib.request.urlretrieve(url, temp_file)
-            self.report({"DEBUG"}, f"Successfully downloaded model to {temp_file}")
-            return temp_file
-        except Exception as e:
-            self.report({"ERROR"}, f"Error downloading model: {str(e)}")
-            raise
-
-    def import_model(self, filepath: str) -> None:
-        """Import the model file using the appropriate Blender importer"""
-        file_ext = os.path.splitext(filepath)[1].lower()
-
-        if file_ext == ".glb" or file_ext == ".gltf":
-            bpy.ops.import_scene.gltf(filepath=filepath)
-        else:
-            raise ValueError(f"Unsupported file format: {file_ext}")
-
-    def create_or_get_collection(
-        self, name: str, parent: Collection | None = None
-    ) -> Collection:
-        """Create a new collection or get existing one"""
-        if name in bpy.data.collections:
-            collection = bpy.data.collections[name]
-        else:
-            collection = bpy.data.collections.new(name)
-            if parent:
-                parent.children.link(collection)
-            else:
-                bpy.context.scene.collection.children.link(collection)
-
-        return collection
-
-    def get_iiif_id_or_label(self, data: dict) -> str:
-        """Get the IIIF ID or label from the given data"""
-        iiif_id = data.get("id", "Unnamed ID")
-        label = data.get("label", {}).get("en", [iiif_id])[0]
-        return label
-
-    def body_to_object(self, body_data : dict, target_data: dict, anno_collection:Collection) -> Object:
+#     def download_model(self, url: str) -> str:
+#         """Download the model file from the given URL"""
+#         temp_dir = bpy.app.tempdir
+#         time_string = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+#         model_name = os.path.basename(url)
+#         model_extension = os.path.splitext(model_name)[1]
+#         temp_file = os.path.join(
+#             temp_dir, f"temp_model_{time_string}_{model_name}{model_extension}"
+#         )
+# 
+#         try:
+#             self.report({"DEBUG"}, f"Downloading model from {url} to {temp_file}")
+#             urllib.request.urlretrieve(url, temp_file)
+#             self.report({"DEBUG"}, f"Successfully downloaded model to {temp_file}")
+#             return temp_file
+#         except Exception as e:
+#             self.report({"ERROR"}, f"Error downloading model: {str(e)}")
+#             raise
+# 
+#     def import_model(self, filepath: str) -> None:
+#         """Import the model file using the appropriate Blender importer"""
+#         file_ext = os.path.splitext(filepath)[1].lower()
+# 
+#         if file_ext == ".glb" or file_ext == ".gltf":
+#             bpy.ops.import_scene.gltf(filepath=filepath)
+#         else:
+#             raise ValueError(f"Unsupported file format: {file_ext}")
+# 
+# 
+    def body_to_object(self, body_data : dict, target_data: dict) -> Object:
         """
         body is the  python dictionry obtained by unpacking hte json value of the body property.
         type of the outer layer of th dictionary may be SpecificResource, or may
@@ -241,71 +197,53 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         """     
         # placement_data is a dictionary whose entries will be filled with 
         # values from target and body, if either or both are SpecificResources   
-        placement_data = {
-        "location" : None,
-        "rotation" : None,
-        "scale"    : None
-        }
+        placement_data = self.get_object_placement(body_data, target_data)
         
-        self.update_placement_from_target(target_data, placement_data)
+        
         if body_data["type"] == "SpecificResource":
             resource_data = force_as_object(
-                force_as_singleton(body_data.get("source", None)), default_type="Model"
+             force_as_singleton(body_data.get("source", None)), default_type="Model"
             )
-            self.update_placement_from_body(body_data, placement_data)
         else:
             resource_data = body_data
-
+        
         resource_type :str = resource_data["type"]
         if resource_type == "Model":
-            return self.resource_data_to_model(resource_data, placement_data, anno_collection)
+            return self.resource_data_to_model(resource_data, placement_data)
         elif resource_type in ("PerspectiveCamera",):
-            return self.resource_data_to_camera(resource_data, placement_data, anno_collection)
+            return self.resource_data_to_camera(resource_data, placement_data)
         raise ImportManifestError("Resource type %s not supported for annotation body" % resource_type)
-
-    def resource_data_to_model(self, resource_data, placement_data, anno_collection) -> Object:
+# 
+    def resource_data_to_model(self, resource_data, placement_data) -> Object:
         """
         download, create, and configure model object
         """
-        model_id = resource_data.get("id", None)
+        from .editing.models import configure_model
         
-        temp_file = self.download_model(model_id)
-        self.import_model(temp_file)
+        model_url = resource_data.get("id", None)
+        if model_url is None:
+            raise ImportManifestError("no url for model provided")
+        
+        import_result = bpy.ops.iiif.import_network_model(model_url=model_url) # pyright: ignore[reportAttributeAccessIssue]
+        logger.debug("bpy.ops.iiif.import_model result: %r" % import_result)
+        if "FINISHED" not in import_result:
+            raise ImportManifestError("import Operation failed with %r" % import_result)
+
         new_model = bpy.context.active_object
         if new_model is None:
             raise ImportManifestError("bpy.context.active_object not set")
-        else:
-            new_model["iiif_id"] = model_id
-            new_model["iiif_type"] = "Model"
-            new_model["iiif_json"] = json.dumps(resource_data)
-            
-            if placement_data["location"] is not None:
-                new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
-                
-            if placement_data["rotation"] is not None:
-                saved_mode = new_model.rotation_mode
-                try:
-                    euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
-                    new_model.rotation_mode = euler.order
-                    new_model.rotation_euler = euler
-                finally:
-                    new_model.rotation_mode = saved_mode            
-    
-            if placement_data["scale"] is not None:
-                new_model.scale = Vector( placement_data["scale"] )
-            
-            # ensure the model is in the anno_collection; this is
-            # required for IIIF Manifest export
-            for col in new_model.users_collection:
-                col.objects.unlink(new_model)
-            anno_collection.objects.link(new_model)
-        return new_model
         
-    def resource_data_to_camera(self, resource_data, placement_data, anno_collection) -> Object:
+        configure_model(    new_model, 
+                            model_url, 
+                            resource_data = resource_data, 
+                            placement_data =  placement_data)
+        return new_model
+         
+    def resource_data_to_camera(self, resource_data, placement_data) -> Object:
         """
         create, and configure camera object
         """
-
+        from .editing.cameras import configure_camera
         try:
             retCode = bpy.ops.object.camera_add()
             logger.info("obj.camera_add %r" % (retCode,))
@@ -313,39 +251,17 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             logger.error("add camera error", exc)
 
         new_camera = bpy.context.active_object
-        if new_camera is not None:
-            configure_camera( new_camera )
+        if new_camera is None:
+            raise  ImportManifestError("failed to add camera")
             
-            if "fieldOfView" in resource_data:
-                foV = force_as_singleton(resource_data["fieldOfView"])
-                if foV is not None: 
-                    new_camera.data.angle_y = math.radians( float( foV )) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-                    del resource_data["fieldOfView"]
-                
-            new_camera["iiif_id"] = generate_uri("PerspectiveCamera")
-            new_camera["iiif_type"] = "PerspectiveCamera"
-            new_camera["iiif_json"] = json.dumps(resource_data)
-            
-            if placement_data["location"] is not None:
-                new_camera.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
-                
-            if placement_data["rotation"] is not None:
-                euler = Coordinates.camera_transform_angles_to_blender_euler( placement_data["rotation"] )
-                new_camera.rotation_mode = euler.order
-                new_camera.rotation_euler = euler
-    
-                
-            # ensure the model is in the anno_collection; this is
-            # required for IIIF Manifest export
-            for col in new_camera.users_collection:
-                col.objects.unlink(new_camera)
-            anno_collection.objects.link(new_camera)
-            return new_camera
-        else:
-            raise ImportManifestError("unable to import camera")
+        configure_camera(   new_camera,
+                            resource_data = resource_data, 
+                            placement_data =  placement_data)
+        return new_camera
+        
 
     
-    def update_placement_from_target(self, target_data, placement_data):
+    def get_object_placement(self, body_data:dict , target_data : dict):
         """
         examines the content of target_data dictionary and identify if
         properties of the target determine information on placement of model 
@@ -355,15 +271,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         with a PointSelector will be handled.
         
         value of the location property will be set with a 3-tuple in IIIIF Coordinates       
-        """
-        if  target_data["type"] == "SpecificResource":
-            sel = force_as_singleton( target_data["selector"] )
-            if sel and sel["type"] == "PointSelector":
-                placement_data["location"] = axes_named_values( sel )
-        return
         
-    def update_placement_from_body(self, body_data, placement_data):
-        """
         examines the content of body_data dictionary and identify if
         properties of the body determine information on placement of model 
         in the Blender scene
@@ -373,6 +281,9 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
         value of the rotation and scale property will be set with a 3-tuple in IIIIF Coordinates 
         """
+        
+        placement_data = {}
+        
         if  body_data["type"] == "SpecificResource" and \
             body_data.get("transform", False):
             for transform in force_as_list(body_data["transform"]):
@@ -385,12 +296,10 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
                         if placement_data[placement_property] is not None:
                             logger.warning("%s is being overwritten" % placement_property)
                         placement_data[placement_property] = axes_named_values(transform)
+
+        if  target_data["type"] == "SpecificResource":
+            sel = force_as_singleton( target_data["selector"] )
+            if sel and sel["type"] == "PointSelector":
+                placement_data["location"] = axes_named_values( sel )
         return
-           
-    
-
-    
-
-
-                
-    
+        
