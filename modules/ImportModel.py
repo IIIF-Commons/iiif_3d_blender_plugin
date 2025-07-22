@@ -3,17 +3,15 @@ import os
 import urllib.request
 from typing import Set
 
+from .editing.collections import new_annotation
+
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Context, Operator
 from bpy_extras.io_utils import ImportHelper
 
-from .initialize_collections import initialize_annotation
 import json
 import logging
-
-from ..utils.blender_naming import generate_name_from_id
-
 logger = logging.getLogger("import-model")
 
 
@@ -35,6 +33,14 @@ class ImportModel(Operator, ImportHelper):
         subtype="FILE_PATH",
         options={'HIDDEN'}
     )
+    
+    mime_type: StringProperty(  # type: ignore
+        name="MIMETYPE",
+        description="MIMETYPE as returned from fetch headers",
+        maxlen=0,
+        subtype="NONE",
+        options={'HIDDEN'}
+    )
 
     model_url: StringProperty(  # type: ignore
         name="URL / IIIF id",
@@ -46,27 +52,18 @@ class ImportModel(Operator, ImportHelper):
         
     def execute(self, context: Context) -> Set[str]:
 
-        annotation_page_collection = context.collection
-        if not annotation_page_collection.get("iiif_type","") == "AnnotationPage":
-            logger.warning("invalid context.collection: %r" % (annotation_page_collection,))
-            return {"CANCELLED"}
-            
         if not self.filepath:
             logger.warning("ImportModel.execute : no filepath set" )
             return {"CANCELLED"}
         
         logger.info("call to import model at %s" % self.filepath)
-        # logging.getLogger('glTFImporter')
-        #storedLevel = logging.getLogger('glTFImporter').level
-        #logging.getLogger('glTFImporter').setLevel(logger.level)
+
         try:
             retCode = bpy.ops.import_scene.gltf(filepath=self.filepath, loglevel=2)
             logger.info("gltf import returned %r" % (retCode,))
         except Exception as exc:
             logger.error("glTF import error", exc)
             return {"FINISHED"}
-        #finally:
-        #    logging.getLogger('glTFImporter').setLevel(storedLevel)
         
         new_model = bpy.context.active_object
         if new_model is not None:
@@ -99,17 +96,7 @@ class ImportModel(Operator, ImportHelper):
             
             new_model["iiif_json"] = json.dumps(new_model_data)
             new_model["iiif_type"] = "Model"
-            
-            annotation_collection=bpy.data.collections.new("Annotation")
-            initialize_annotation( annotation_collection )    
-            annotation_page_collection.children.link(annotation_collection) 
-            annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
-    
-            if new_model.users_collection is not None:
-                for col in new_model.users_collection:
-                    col.objects.unlink(new_model)
-            annotation_collection.objects.link(new_model)       
-        
+                    
         
         return {"FINISHED"}
 
