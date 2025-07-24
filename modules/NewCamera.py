@@ -1,13 +1,9 @@
-
 import bpy
 from bpy.types import Operator
 
-
-from .initialize_collections import initialize_annotation, generate_uri
-
-from ..utils.blender_setup import configure_camera
-from ..utils.coordinates import Coordinates
-from ..utils.blender_naming import generate_name_from_id
+from .editing import generate_id
+from .editing.collections import new_annotation
+from .utils.coordinates import Coordinates
 
 import logging
 logger = logging.getLogger("iiif.new_camera")
@@ -42,24 +38,20 @@ class NewCamera(Operator):
         new_camera = bpy.context.active_object
         if new_camera is not None:
             logger.info("new_camera: %r" % (new_camera,))
-            configure_camera(new_camera)
             
             # at this stage only support creating a PerspectiveCamera
             # TODO will be to present a UI that will allow user to 
             # choose what type of camera; and potentially a value for a label
             new_camera.data.type = "PERSP" # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
             
-            new_camera["iiif_id"]=  generate_uri("PerspectiveCamera")
+            new_camera["iiif_id"]=  generate_id("perspectivecamera")
     
             new_camera['iiif_type']="PerspectiveCamera"
             
     
-            annotation_collection=bpy.data.collections.new("Annotation")
-            initialize_annotation( annotation_collection )    
+            annotation_collection=new_annotation()
             annotation_page_collection.children.link(annotation_collection) 
-            annotation_collection.name = generate_name_from_id( annotation_collection ) or annotation_collection.name
-    
-                    
+
             for col in new_camera.users_collection:
                 col.objects.unlink(new_camera)
             annotation_collection.objects.link(new_camera)
