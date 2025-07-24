@@ -1,5 +1,9 @@
 import bpy
 import json
+from bpy.types import Collection
+from  typing import Optional
+
+from . import generate_id, generate_name_from_data
 
 import logging
 logger = logging.getLogger("iiif.collections")
@@ -17,96 +21,184 @@ logger.setLevel(logging.INFO)
 
 
 
-def initialize_manifest( manifest_collection ):
-    manifest_collection["iiif_id"] = generate_uri("Manifest")
-    manifest_collection["iiif_type"] = "Manifest"
+MANIFEST_TYPE="Manifest"
+SCENE_TYPE=   "Scene"
+ANNOTATIONPAGE_TYPE= "AnnotationPage"
+ANNOTATION_TYPE = "Annotation"
 
+
+
+def _new_collection( data:dict) -> Collection:
     """
-    Design intent is that the manifest_init_data will be a core of
-    the final json representation of the manifest.
-    
-    the values for id and type will be populated upon export from the 
-    corresponding iiif_id and iiif_type Blender custom properties    
-    
-    Intent is that the iiif properties label and rights for the manifest will be
-    editable. They are initialized here within the manifest_init_data dictionary, 
-    upon execution of the to-be implemented Blender Operator instance the label / rights
-    value will be retrieved from the manifest_init_data, edited by user, then upon
-    confirmation entered back into the manifest_init_data dictionary
-    
-    Note: This initialization will NOT be invoked when a manifest is imported.
-    For imported manifests the id and type iiif properties will be moved into
-    iiif_* custom properties; a Scene instance will be removed from items list and
-    will populate the Scene Blender collection, any Canvas in items will just remain 
-    in the iiif_json dictionary. All other iiif properties will be maintained in the
-    iiif_json custom property. The editing code for "label" and "rights" will decide 
-    what to do if those iiif properties are not defined in the imported manifest, or
-    are defined in a non-standard way.
-    
-    In following initialization of data, entering invalid None values for several
-    properties. It's been seen that in Python 3.11 the the output printed json
-    text will be in this order, which is more judged more readable.
+    returns a Blender collection for which:
+    the custom properties iiif_type, iiif_id have been set to string values
+        custom property iiif_data has been set to json-encoded dictionary
+        property name is defined
+        
+    collection will have no children, and will not have been added as child of
+    a parent collection  
     """
-    manifest_init_data = {
+
+    collection_type : str = data["type"]
+
+    if "id" not in data:
+        data["id"] = generate_id(collection_type)
+    
+    blender_name : str = generate_name_from_data( data ) or collection_type.lower()
+    
+    retVal  = bpy.data.collections.new(blender_name)
+    retVal["iiif_data"] =  json.dumps( data )
+    retVal["iiif_id"] =    data["id"]
+    retVal["iiif_type"] =  data["type"]
+    return retVal
+    
+
+def new_manifest( data:Optional[dict] = None ) -> Collection:
+    
+    valid_data : dict = data or _initial_data(MANIFEST_TYPE)    
+    return _new_collection(valid_data)
+        
+def new_scene( data:Optional[dict] = None ) -> Collection:
+    
+    valid_data : dict = data or _initial_data(SCENE_TYPE)   
+    return _new_collection(valid_data)
+
+def new_annotation_page( data:Optional[dict] = None ) -> Collection:
+    
+    valid_data : dict = data or _initial_data(ANNOTATIONPAGE_TYPE)    
+    return _new_collection(valid_data)
+
+def new_annotation( data:Optional[dict] = None ) -> Collection:
+    
+    valid_data : dict = data or _initial_data(ANNOTATION_TYPE)    
+    return _new_collection(valid_data)
+
+_collection_template_dict  = {
+    MANIFEST_TYPE : {
         "@context": "http://iiif.io/api/presentation/4/context.json",
         "id" : None,
-        "type" : None,
-        "rights" : None,
-        "label" : None,
+        "type" : "Manifest",
+        "label" : {},
+        # By default the manifest is assigned the Creative Commons
+        # CC BY 4.0 : Attribution 4.0 International license
+        # https://creativecommons.org/licenses/by/4.0
+        # 
+        # See Presentation 3 API 
+        # https://iiif.io/api/presentation/3.0/#rights
+        # for allowed value of the 'rights' property
+        "rights": "https://creativecommons.org/licenses/by/4.0/",
         "items" : []
-    }
+    },
     
+    SCENE_TYPE : {
+        "id" : None,
+        "type" : "Scene",
+        "label" : {},
+        "items" : []
+    },
+    
+    ANNOTATIONPAGE_TYPE : {
+        "id" : None,
+        "type" : "Scene",
+        "label" : {},
+        "items" : []    
+    },
+    
+    ANNOTATION_TYPE : {
+        "id" : None,
+        "type" : "Scene",
+        "motivation" : [],
+        "body" : None,
+        "target" : None,
+        "label" : {}
+    }
+}
+    
+def _initial_data(str : str ) -> dict:
+    original = _collection_template_dict[str]
+    # the following:
+    # makes  deep copy of the original  dict
+    # verifies that the result is compatible with json
+    return json.loads( json.dumps(original ))
+    
+"""
+collection_types is the list
+of IIIF resource types which are represented as 
+Blender collections
+"""
+
+
+def _find_resources_by_type(what_iiif_type:str) -> list[Collection]:
+    return [
+        coll for coll in bpy.data.collections \
+        if coll.get("iiif_type", None) == what_iiif_type \
+    ]
+        
+
+def _find_enclosing_resource(iiif_resource : Collection, enclosing_type : str ):
     """
-    By default the manifest is assigned the Creative Commons
-    CC BY 4.0 : Attribution 4.0 International license
-    https://creativecommons.org/licenses/by/4.0
+    iiif_resource must be a Python instances for which the calls
+    iiif_resource.get("iiif_id") and
+    iiif_resource.get("iiif_type")
+    return strings, 
     
-    See Presentation 3 API 
-    https://iiif.io/api/presentation/3.0/#rights
-    for allowed value of the 'rights' property
+    enclosing_type will be one of:
+    Manifest, Scene, AnnotationPage
+    
+    will return the Blender Collection instance that matches teh enclosing_type
     """
-
-    manifest_init_data["rights"] = "https://creativecommons.org/licenses/by/4.0/"
-    manifest_init_data["label"] = {"none" : ["default-manifest-label"]}
-    
-    manifest_collection["iiif_json"] = json.dumps(manifest_init_data)
- 
-def initialize_scene( scene_collection ):  
-
-    scene_collection["iiif_id"]  = generate_uri(resource_type="Scene")
-    scene_collection["iiif_type"]  = "Scene"
-    
-
-    scene_init_data = {
-        "id" : None,
-        "type" : None,
-        "label" : {"none":["default-scene-label"]},
-        "items" : []
+    parent_type_dict = {
+        ANNOTATION_TYPE : ANNOTATIONPAGE_TYPE ,
+        ANNOTATIONPAGE_TYPE : SCENE_TYPE,
+        SCENE_TYPE : MANIFEST_TYPE
     }
-    scene_collection["iiif_json"] = json.dumps(scene_init_data)
+    search_id = iiif_resource.get("iiif_id", None)
+    if search_id is None:
+        return None
+        
+    for coll in _find_resources_by_type(parent_type_dict[iiif_resource.get("iiif_type",None)]):
+        
+        for ch in coll.children:
+            if ch.get("iiif_id",None) == search_id:
+                if coll.get("iiif_type", None) == enclosing_type:
+                    return coll
+                else:
+                    return _find_enclosing_resource(coll, enclosing_type)
 
-def initialize_anotation_page( page_collection ):  
-
-    page_collection[ "iiif_id"] = generate_uri(resource_type="AnnotationPage")
-    page_collection["iiif_type"]  = "AnnotationPage"  
-      
-    page_init_data = {
-        "id" : None,
-        "type" : None,
-        "label" : {"none":["default-annotation-page-label"]},
-        "items" : []
-    }
-    page_collection["iiif_json"] = json.dumps(page_init_data)
+def _find_child_resources_by_type( parent_collection, what_iiif_type ):
+    return [coll for coll in parent_collection.children \
+            if coll.get("iiif_type",None) == what_iiif_type ]
+              
+def getTargetScene(iiif_resource):
+    """
+    Intended for case where iiif_resource is an Annotation
+    returns the Blender Collection for the parent collection that represents
+    the Scene, from which the iiii_id can be retrieved to form the Annotation target
+    or the source of an SpecificResource
+    """
+    return _find_enclosing_resource(iiif_resource, "Scene")
     
-def initialize_annotation( annotation_collection ):  
-
-    annotation_collection[ "iiif_id"] = generate_uri(resource_type="Annotation")
-    annotation_collection["iiif_type"]  = "Annotation"  
-      
-    anno_init_data = {
-        "id" : None,
-        "type" : None
-    }
-    annotation_collection["iiif_json"] = json.dumps(anno_init_data)
- 
+def getManifests():
+    return _find_resources_by_type("Manifest")
     
+def getScenes(manifest_collection):
+    """
+    manifest_collection the Blender Collection representing a manifest
+    """
+    return _find_child_resources_by_type( manifest_collection, "Scene" )
+    
+def getAnnotationPages(scene_collection):
+    return _find_child_resources_by_type( scene_collection, "AnnotationPage" )
+    
+def getAnnotations(page_collection):
+    return _find_child_resources_by_type( page_collection, "Annotation" )
+
+    
+def getBodyObject(anno_collection) -> bpy.types.Object | None:
+    
+    bodyObjList = [obj for obj in anno_collection.objects if obj.get("iiif_type", None)]
+    if len(bodyObjList) == 0:
+        return None
+    if len(bodyObjList) > 1:
+        logger.warning("multiple body objects in single Annotation")
+    return bodyObjList[0]
