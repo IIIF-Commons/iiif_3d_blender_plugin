@@ -197,7 +197,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             raise ImportManifestError("no url for model provided")
         mimetype = resource_data.get("format","")
         _op : Callable[..., Set[str]] = bpy.ops.iiif.import_network_model # pyright:ignore[reportAttributeAccessIssue]
-        import_result = _op(model_url=model_url, mime_type = mimetype ) 
+        import_result = _op(model_url=model_url, mimetype = mimetype ) 
         logger.debug("bpy.ops.iiif.import_model result: %r" % import_result)
         if "FINISHED" not in import_result:
             raise ImportManifestError("import Operation failed with %r" % import_result)

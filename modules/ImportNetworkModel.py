@@ -25,13 +25,13 @@ class ImportNetworkModel(Operator):
     bl_label = "Import remote resource as model"    
 
     """
-    mime_type property can be set by clients if there's already
+    mimetype property can be set by clients if there's already
     knowledge of what the mime-type of a resource is, this would
     typically be in the format property of a resource being imported
     as part of importing a manifest. If not specified by the client, then
-    the mime_type will be taken from the Content-Type of the response HTTP headers
+    the mimetype will be taken from the Content-Type of the response HTTP headers
     """
-    mime_type: StringProperty(  # type: ignore
+    mimetype: StringProperty(  # type: ignore
         name="MIMETYPE",
         description="MIMETYPE as returned from fetch headers",
         maxlen=0,
@@ -73,25 +73,25 @@ class ImportNetworkModel(Operator):
                     return {"CANCELLED"}
                  
                 try:
-                    http_mime_type = http_open_context.headers["Content-Type"]
+                    http_mimetype = http_open_context.headers["Content-Type"]
                 except KeyError:
-                    http_mime_type = ""
+                    http_mimetype = ""
                     
                     
                 with open(local_filepath, 'wb') as out_file:
                     shutil.copyfileobj(http_open_context, out_file)
                 # closing out of urlopen Context Manager, with 
                 # URL data downloaded to local_filepath and 
-                # http_mime_type set to the Content-Type (or to "")
+                # http_mimetype set to the Content-Type (or to "")
     
                     
-            mime_type = self.mime_type or http_mime_type
+            mimetype = self.mimetype or http_mimetype
             
             # call the ImportLocalModel Operator to import the contents
             # of the local_filepath file into Blender as a Blender Object
             _op : Callable[...,Set[str]] = \
             bpy.ops.iiif.import_local_model # pyright:ignore[reportAttributeAccessIssue]
-            res = _op(filepath=local_filepath, mime_type=mime_type)
+            res = _op(filepath=local_filepath, mimetype=mimetype)
             
             # Closing out of the TemporaryDirectory context manager. The directory
             # and the local_filepath will be deleted.

@@ -19,10 +19,10 @@ class ImportLocalModel(Operator):
     
     precontract:
     string filepath will be to a local filesystem file
-    string mime_type will be a mime_type of the resource
+    string mimetype will be a mimetype of the resource
         typical value of a mimetyp would be "model/gltf-binary"
         Its the responsibility of clients that execute this Operator
-        to set the mime_type, based on :
+        to set the mimetype, based on :
            -- the value of IIIF format property in an IIIF resource
            -- the Content-Type from a HTTP header in a network fetch
            -- 
@@ -54,7 +54,7 @@ class ImportLocalModel(Operator):
         options={'HIDDEN'}
     )
     
-    mime_type: StringProperty(  # type: ignore
+    mimetype: StringProperty(  # type: ignore
         name="MIMETYPE",
         description="MIMETYPE as returned from fetch headers",
         maxlen=0,
@@ -64,7 +64,7 @@ class ImportLocalModel(Operator):
         
     def execute(self, context: Context) -> Set[str]:
 
-        mime_type = self.mime_type or mimetype_from_extension(self.filepath)
+        mimetype = self.mimetype or mimetype_from_extension(self.filepath)
             
         # the key string is a mimetype
         # the value is callable object compatible with
@@ -82,9 +82,9 @@ class ImportLocalModel(Operator):
         }
 
         try:
-            handler, handler_name = importer_dict[mime_type]
+            handler, handler_name = importer_dict[mimetype]
         except KeyError:
-            message = "unsupported mime_type : %s" % mime_type
+            message = "unsupported mimetype : %s" % mimetype
             logger.warn(message)
             return {'CANCELLED'}
            
@@ -109,7 +109,7 @@ class ImportLocalModel(Operator):
             # this custom property is defined here and removed by the configure_model
             # function; it is essentially a way of passing data from this Operator instance
             # to client code that executes it. 
-            new_model[IIIF_TEMP_FORMAT] = self.mime_type
+            new_model[IIIF_TEMP_FORMAT] = self.mimetype
         
         # TODO: insert code to record the new_model location, rotation, scaling
         # properties 
