@@ -12,9 +12,13 @@ from .utils.json_patterns import (
     create_axes_named_values
 )
 
+from .editing.collections import (getScenes, 
+                    getTargetScene, 
+                    getAnnotations, 
+                    getAnnotationPages,
+                    getBodyObject,
+                    getManifests)
 from .utils.blender_setup import get_scene_background_color
-
-from . import navigation as nav
 
 import math
 
@@ -66,7 +70,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         manifest_data = self.get_base_data(manifest_collection)
         
         manifest_data["items"] = manifest_data.get("items", None) or []
-        for scene_collection in nav.getScenes(manifest_collection):
+        for scene_collection in getScenes(manifest_collection):
             manifest_data["items"].append(self.get_scene_data(scene_collection))
         return manifest_data
         
@@ -81,7 +85,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
             scene_data["backgroundColor"] = color_hex
         
         scene_data["items"] = scene_data.get("items", None) or []
-        for page_collection in nav.getAnnotationPages(scene_collection):
+        for page_collection in getAnnotationPages(scene_collection):
             scene_data["items"].append(self.get_annotation_page_data(page_collection))
         return scene_data
 
@@ -90,7 +94,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         page_data = self.get_base_data(page_collection)
         
         page_data["items"] = page_data.get("items", None) or []
-        for anno_collection in nav.getAnnotations(page_collection):
+        for anno_collection in getAnnotations(page_collection):
             page_data["items"].append(self.get_annotation_data(anno_collection))
 
         
@@ -106,7 +110,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
 #        a PointSelector-based SpecificResource considered to be
 #        a refinement of the target Scene. But in Blender, the location
 #        is represented in the data for the Model
-        bodyObj = nav.getBodyObject(anno_collection)
+        bodyObj = getBodyObject(anno_collection)
         
         if bodyObj is not None:
             anno_data["target"] = self.target_data_for_object(bodyObj, anno_collection)
@@ -262,7 +266,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         """  
         ALWAYS_USE_POINTSELECTOR=False
          
-        enclosing_scene=nav.getTargetScene(anno_collection)
+        enclosing_scene=getTargetScene(anno_collection)
         if enclosing_scene is not None:
             scene_ref_data = {
                 "id" :   enclosing_scene.get("iiif_id"),
@@ -289,7 +293,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
 
     def execute(self, context: Context) -> Set[str]:
         """Export Blender scene as IIIF manifest"""
-        manifests = nav.getManifests()
+        manifests = getManifests()
         
         if manifests:   # that is, not an empty list
             if len(manifests) > 1:

@@ -1,4 +1,7 @@
-def generate_id(resource_type="Manifest"):
+from typing import Optional
+import bpy
+
+def generate_id(resource_type="Manifest") -> str:
     """
     generates an identifier following the convention for a 
     'blank node identifier' (see https://www.w3.org/TR/rdf11-concepts/#dfn-blank-node-identifier)
@@ -16,3 +19,23 @@ def generate_id(resource_type="Manifest"):
             imax = max(imax,val)
     retVal = prefix + str(imax+1)
     return retVal
+
+def generate_name_from_data( data : dict ) -> Optional[str] : 
+    """
+    Will try to identify a suitable string to identity the collection
+    in the Blender UI Outline UI panel.
+    
+    Will first try to identify a string from the label entry of data, then
+    use the id if available
+    """
+    
+    if "label" in data:
+        for language_labels in data.items():
+            if len(language_labels) > 0:
+                return language_labels[0]
+    
+    if "id" in data:
+        comps =  data["id"].split("/")   
+        if comps:
+            return "/".join(comps)  
+    return None

@@ -3,9 +3,10 @@ from bpy.utils import register_class, unregister_class
 
 from .modules.exporter import ExportIIIF3DManifest
 from .modules.importer import ImportIIIF3DManifest
-from .modules.editing.import_model import ImportLocalModel, ImportNetworkModel
-from .modules.editing.new_manifest import NewManifest
-from .modules.editing.new_camera import NewCamera
+from .modules.ImportLocalModel import ImportLocalModel
+from .modules.ImportNetworkModel import ImportNetworkModel
+from .modules.NewManifest import NewManifest
+from .modules.NewCamera import NewCamera
 
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
