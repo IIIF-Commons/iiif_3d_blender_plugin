@@ -1,6 +1,7 @@
 
 import json
-from typing import Set
+
+from typing import Set, Callable
 
 import bpy
 from bpy.props import StringProperty
@@ -153,35 +154,6 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         self.body_to_object(body_data, target_data )
         return
                     
-#     def download_model(self, url: str) -> str:
-#         """Download the model file from the given URL"""
-#         temp_dir = bpy.app.tempdir
-#         time_string = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-#         model_name = os.path.basename(url)
-#         model_extension = os.path.splitext(model_name)[1]
-#         temp_file = os.path.join(
-#             temp_dir, f"temp_model_{time_string}_{model_name}{model_extension}"
-#         )
-# 
-#         try:
-#             self.report({"DEBUG"}, f"Downloading model from {url} to {temp_file}")
-#             urllib.request.urlretrieve(url, temp_file)
-#             self.report({"DEBUG"}, f"Successfully downloaded model to {temp_file}")
-#             return temp_file
-#         except Exception as e:
-#             self.report({"ERROR"}, f"Error downloading model: {str(e)}")
-#             raise
-# 
-#     def import_model(self, filepath: str) -> None:
-#         """Import the model file using the appropriate Blender importer"""
-#         file_ext = os.path.splitext(filepath)[1].lower()
-# 
-#         if file_ext == ".glb" or file_ext == ".gltf":
-#             bpy.ops.import_scene.gltf(filepath=filepath)
-#         else:
-#             raise ValueError(f"Unsupported file format: {file_ext}")
-# 
-# 
     def body_to_object(self, body_data : dict, target_data: dict) -> Object:
         """
         body is the  python dictionry obtained by unpacking hte json value of the body property.
@@ -223,8 +195,9 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         model_url = resource_data.get("id", None)
         if model_url is None:
             raise ImportManifestError("no url for model provided")
-        
-        import_result = bpy.ops.iiif.import_network_model(model_url=model_url) # pyright: ignore[reportAttributeAccessIssue]
+        mimetype = resource_data.get("format","")
+        _op : Callable[..., Set[str]] = bpy.ops.iiif.import_network_model # pyright:ignore[reportAttributeAccessIssue]
+        import_result = _op(model_url=model_url, mime_type = mimetype ) 
         logger.debug("bpy.ops.iiif.import_model result: %r" % import_result)
         if "FINISHED" not in import_result:
             raise ImportManifestError("import Operation failed with %r" % import_result)
@@ -233,10 +206,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         if new_model is None:
             raise ImportManifestError("bpy.context.active_object not set")
         
-        configure_model(    new_model, 
-                            model_url, 
-                            resource_data = resource_data, 
-                            placement_data =  placement_data)
+        configure_model(new_model, resource_data,  placement_data)
         return new_model
          
     def resource_data_to_camera(self, resource_data, placement_data) -> Object:
