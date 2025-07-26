@@ -261,10 +261,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
                     ("RotateTransform","rotation"),
                     ("ScaleTransform","scale"),
                 ):
-                    transform_type = transform["type"]
-                    if transform_type == transform_compare:
-                        if placement_data[placement_property] is not None:
-                            logger.warning("%s is being overwritten" % placement_property)
+                    if transform["type"] == transform_compare:
                         placement_data[placement_property] = axes_named_values(transform)
 
         if  target_data["type"] == "SpecificResource":

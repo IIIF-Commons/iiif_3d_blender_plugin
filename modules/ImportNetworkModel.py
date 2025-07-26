@@ -74,6 +74,7 @@ class ImportNetworkModel(Operator):
                  
                 try:
                     http_mimetype = http_open_context.headers["Content-Type"]
+                    logger.debug(f"http header shows Content-Type {http_mimetype}")
                 except KeyError:
                     http_mimetype = ""
                     

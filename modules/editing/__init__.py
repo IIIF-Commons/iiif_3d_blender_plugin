@@ -30,12 +30,20 @@ def generate_name_from_data( data : dict ) -> Optional[str] :
     """
     
     if "label" in data:
-        for language_labels in data.items():
-            if len(language_labels) > 0:
-                return language_labels[0]
+        for language,label_items in data["label"].items():
+            if len(label_items) > 0:
+                return label_items[0]
     
-    if "id" in data:
-        comps =  data["id"].split("/")   
-        if comps:
-            return "/".join(comps)  
+    try:
+        id_copy = data["id"]
+    except KeyError:
+        pass
+    else:
+        colon_index = id_copy.find(":") 
+        if colon_index >= 0:
+            id_copy = id_copy[colon_index+1:] # strip off scheme, "http","file", or "_"
+        if id_copy:
+            comps =  id_copy.split("/")[-2:]
+            if comps:
+                return "/".join(comps)  
     return None

@@ -41,7 +41,7 @@ def _new_collection( data:dict) -> Collection:
 
     collection_type : str = data["type"]
 
-    if "id" not in data:
+    if data.get("id", None) is None:
         data["id"] = generate_id(collection_type)
     
     blender_name : str = generate_name_from_data( data ) or collection_type.lower()
@@ -99,14 +99,14 @@ _collection_template_dict  = {
     
     ANNOTATIONPAGE_TYPE : {
         "id" : None,
-        "type" : "Scene",
+        "type" : "AnnotationPage",
         "label" : {},
         "items" : []    
     },
     
     ANNOTATION_TYPE : {
         "id" : None,
-        "type" : "Scene",
+        "type" : "Annotation",
         "motivation" : [],
         "body" : None,
         "target" : None,

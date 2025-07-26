@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, Callable, Tuple
 
 
 from .editing.models import  IIIF_TEMP_FORMAT, mimetype_from_extension
@@ -74,15 +74,9 @@ class ImportLocalModel(Operator):
         # Developer note: this dictionary is constructed at run time
         # so that an existing importer Operator can be wrapped at run-time
         # with a wrapper function that supplied other import arguments
-        
-        GLTF_IMPORTER = (bpy.ops.import_scene.gltf,"glTF/glb Blender core add-on")
-        importer_dict = {
-            "model/gltf-binary" : GLTF_IMPORTER,
-            "model/gltf+json"   : GLTF_IMPORTER,
-        }
 
         try:
-            handler, handler_name = importer_dict[mimetype]
+            handler, handler_name = handler_for_mimetype(mimetype)
         except KeyError:
             message = "unsupported mimetype : %s" % mimetype
             logger.warn(message)
@@ -116,3 +110,37 @@ class ImportLocalModel(Operator):
         return {"FINISHED"}
 
 
+def wrapped_gltf(*args, **keyw) -> Set[str]:
+    """
+    A wrapper around the Blender addon-core gltf Importer.
+    this wrapper serves the purpose of quieting the logging INFO messages
+    see:
+    blender/scripts/addons_core/io_scene_gltf2/__init__.py
+    class ImportGLTF2; function set_debug_log
+    """
+    saved_debug_value = bpy.app.debug_value
+    bpy.app.debug_value = 1 # this is equivalent to logging.WARN
+    try:
+        return bpy.ops.import_scene.gltf(*args, **keyw)
+    finally:
+        bpy.app.debug_value = saved_debug_value
+
+def handler_for_mimetype( mimetype:str) -> Tuple[Callable[..., Set[str]] , str] :
+    """
+    return 2-tuple (func, label)
+    function is the callable, may be Blender defined operator call such as 
+    bpy.ops.import_scene.gltf 
+    label a string used only for logging messages
+    
+    """
+    
+    GLTF_IMPORTER : Tuple[Callable[..., Set[str]] , str] = \
+        (wrapped_gltf, "glTF/glb Blender core add-on")
+        
+        
+    mimetype_importer_dict = {
+        "model/gltf-binary" : GLTF_IMPORTER,
+        "model/gltf+json"   : GLTF_IMPORTER,
+    }
+    
+    return mimetype_importer_dict[mimetype]
