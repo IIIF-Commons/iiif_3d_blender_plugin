@@ -29,6 +29,7 @@ def configure_model(    new_model : Object,
     resource_data must contain an "id" value
     
     """
+    logger.debug(f"configure_model : placement_data : {repr(placement_data)}")
     try:
         model_id = resource_data["id"]
     except KeyError:
@@ -49,23 +50,24 @@ def configure_model(    new_model : Object,
     if IIIF_TEMP_FORMAT in new_model:
         mimetype = new_model[IIIF_TEMP_FORMAT]
         if "format" in resource_data and resource_data["format"] != mimetype:
-            logger.warn
+            message=f'resource format ${resource_data["format"]} does not match ${mimetype}'
+            logger.warn(message)
     new_model["iiif_type"] = "Model"
     new_model["iiif_json"] = json.dumps(resource_data)
     if placement_data is not None:
-        if placement_data["location"] is not None:
+        if "location" in placement_data:
             new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
          
-        if placement_data["rotation"] is not None:
+        if "rotation" in placement_data:
             saved_mode = new_model.rotation_mode
-        try:
-            euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
-            new_model.rotation_mode = euler.order
-            new_model.rotation_euler = euler
-        finally:
-            new_model.rotation_mode = saved_mode            
+            try:
+                euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
+                new_model.rotation_mode = euler.order
+                new_model.rotation_euler = euler
+            finally:
+                new_model.rotation_mode = saved_mode            
         
-        if placement_data["scale"] is not None:
+        if "scale" in placement_data:
             new_model.scale = Vector( placement_data["scale"] )
     return    
 

@@ -47,9 +47,12 @@ def _new_collection( data:dict) -> Collection:
     blender_name : str = generate_name_from_data( data ) or collection_type.lower()
     
     retVal  = bpy.data.collections.new(blender_name)
-    retVal["iiif_data"] =  json.dumps( data )
     retVal["iiif_id"] =    data["id"]
     retVal["iiif_type"] =  data["type"]
+    
+    # developer note: the iiif_json property will be set after the
+    # child resources from the "items" list have been removed (and used
+    # to initialize child collections)
     return retVal
     
 
