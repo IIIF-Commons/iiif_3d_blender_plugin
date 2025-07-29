@@ -1,6 +1,6 @@
 import bpy
 import json
-from bpy.types import Collection
+from bpy.types import Collection, Object
 from  typing import Optional
 
 from . import generate_id, generate_name_from_data
@@ -73,6 +73,20 @@ def new_annotation( data:Optional[dict] = None ) -> Collection:
     valid_data : dict = data or _initial_data(ANNOTATION_TYPE)    
     return _new_collection(valid_data)
 
+
+def move_collection_into_parent(child: Collection, parent:Collection ) -> None:
+    parent.children.link(child)
+    
+def move_object_into_collection(blender_object : Object, parent: Collection ) -> None:
+    """
+    In Blender an Object can be in multiple collections
+    This function will enforce that Object will only be in one collection, the parent
+    collection
+    """
+    for coll in blender_object.users_collection:
+        coll.objects.unlink(blender_object)
+    parent.objects.link(blender_object)
+    
 _collection_template_dict  = {
     MANIFEST_TYPE : {
         "@context": "http://iiif.io/api/presentation/4/context.json",
