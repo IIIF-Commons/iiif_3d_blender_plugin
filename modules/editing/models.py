@@ -1,6 +1,6 @@
 import json
 from bpy.types import Object
-from mathutils import Vector
+from mathutils import Vector, Quaternion
 
 from ..utils.coordinates import Coordinates
 
@@ -12,6 +12,12 @@ logger = logging.getLogger("iiif.models")
 # is loaded, it will be the mimetype as which the object was successfully loaded
 # from a file
 IIIF_TEMP_FORMAT="iiif.temp.format"
+
+# the string constant INITIAL_TRANSFORM is shared between the ImportLocalModel class,
+# as the key for a custom property attached to a Blender object when it is loaded,
+# the value of the custom property is a string encoding of glTF properties which
+# may rotate, translate, and scale the mesh defined in the glTF binary buffers.
+INITIAL_TRANSFORM="iiif.initial.transform"
 
 
 def configure_model(    new_model : Object,
@@ -92,3 +98,29 @@ def mimetype_from_extension( fname: str ) -> str:
         return _ext_to_mime_dict[ext]
     except KeyError:
         return ""
+        
+def encode_blender_transform(location : Vector, rotation : Quaternion, scale : Vector ) -> str:
+    """
+    encode the 3 values used in Blender object into a string that can be stored
+    as a Blender custom property, and decoded back into the original values
+    
+    encoding strategy: encode as the string representation of a 3-tuple,
+    each element of the tuple is the string returned by the repr() value
+    of a Blender python API object
+    """
+    
+    argTuple = tuple( [ repr(s) for s in [location, rotation, scale ]])
+    return repr( argTuple )
+    
+
+def decode_blender_transform( encoding : str ) -> (Vector, Quaternion, Vector):
+    """
+    reverses the encoding performed by function encode_blender_transform
+    """
+    try:
+        argTuple = eval(encoding)
+        retVal = tuple( [eval(s) for s in argTuple])
+    except Exception:
+        logger.error(f"unable to decode transform: {repr(encoding)}")
+        return (Vector(), Quaternion(), Vector())
+    return retVal
