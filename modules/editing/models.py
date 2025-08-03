@@ -1,5 +1,6 @@
 import json
 from bpy.types import Object
+from typing import Set, Tuple
 from mathutils import Vector, Quaternion
 
 from ..utils.coordinates import Coordinates
@@ -113,7 +114,7 @@ def encode_blender_transform(location : Vector, rotation : Quaternion, scale : V
     return repr( argTuple )
     
 
-def decode_blender_transform( encoding : str ) -> (Vector, Quaternion, Vector):
+def decode_blender_transform( encoding : str ) -> Tuple[Vector, Quaternion, Vector]:
     """
     reverses the encoding performed by function encode_blender_transform
     """

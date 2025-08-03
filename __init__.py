@@ -1,6 +1,8 @@
 from bpy.types import TOPBAR_MT_file_export, TOPBAR_MT_file_import,OUTLINER_MT_collection_new, OUTLINER_MT_collection , Menu
 from bpy.utils import register_class, unregister_class
 
+from .modules.test import RunUnitTests
+
 from .modules.exporter import ExportIIIF3DManifest
 from .modules.importer import ImportIIIF3DManifest
 from .modules.ImportLocalModel import ImportLocalModel
@@ -45,6 +47,7 @@ def menu_func_manifest_submenu(self,context):
         self.layout.menu(OUTLINER_MT_edit_manifest.bl_idname, text="Edit Manifest") 
 
 classes = (
+    RunUnitTests,
     ImportIIIF3DManifest,
     ExportIIIF3DManifest,
     ImportLocalModel,
