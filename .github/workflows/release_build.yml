@@ -16,7 +16,6 @@ jobs:
         run: echo "VERSION=0.2.11" >> $GITHUB_ENV
         # run: echo "VERSION=${{ github.event.release.tag_name && github.event.release.tag_name.startsWith('v') && github.event.release.tag_name != 'v' && github.event.release.tag_name[1:] || github.event.release.tag_name }}" >> $GITHUB_ENV
         
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -76,7 +75,7 @@ jobs:
       - name: Build plugin
         run: |
           # Update the version in blender_manifest.toml
-          sed -i "s/^version[ ]*=.*$/version=$VERSION/g" blender_manifest.toml
+          sed -i "s/^version[ ]*=.*$/version = \"$VERSION\"/g" blender_manifest.toml
           blender --command extension build --output-dir /tmp;
           # Because the upload artifact zips the directory
           # we need to unzip the contents to allow the artifact
