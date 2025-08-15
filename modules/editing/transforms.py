@@ -1,177 +1,285 @@
-
-from  typing import Optional, Tuple, Set, Any, Dict
+from __future__ import annotations
+from  typing import  Set,  Any, Dict, List, Sequence, Callable
 from mathutils import Vector, Quaternion, Euler
-from math import radians, degrees, log
+from math import radians, degrees,   pi
+
+
+# Dev Note: 9 Aug 2025
+# this import of annotations will allow the type hint system
+# to understand the forward references in the definition of the
+
+
 
 import logging
 logger = logging.getLogger("editing.transforms")
 
-"""
-modules for manipulations of IIIF transforms, expressed as ordered lists
-of RotateTransform, ScaleTransform, and TranslateTransform, with transform
-parameters expressed in IIIF axes
-
-and Blender transforms expressed as (3,) tuple-like objects 
-(Vector, Quaternion, Vector) : where the 0 element is the 'scale' transform
-and the [2] element is the translate  transform
-
-Geometrically the active operatation of a Blender transform , considered to be
-operating on xyz coordinates of a point on an object is:
-1. Apply scaling relative to origin
-2. apply rotation with origin the fixed point
-3. Apply translation
-"""
 
 ROTATE_TRANSFORM    = "RotateTransform"
 SCALE_TRANSFORM     = "ScaleTransform"
 TRANSLATE_TRANSFORM = "TranslateTransform"
 
-BLENDER_EULER_ORDER = "YZX"
 
-# this parameter commented out because it is never used in code
-# but included as documentation
-# IIIF_EULER_ORDER    = "ZYX" 
 
-TINY_VALUE = 1.0e-6
-AXIS_KEYS = ("x","y","z")
+class Transform:
+        
+    def inverse(self) -> Transform:
+        raise NotImplementedError()
+        
+    def isIdentity(self) -> bool :
+        raise NotImplementedError()
+        
+    def applyToCoordinate(self, coord : Vector ) -> Vector :
+        raise NotImplementedError()
+        
+    def applyToTransformSetList(self, tset : List[TransformSet]) -> None:
+        raise NotImplementedError() 
+        
+    @staticmethod
+    def from_iiif_dict( iiif_data : dict )  -> Transform:
+        try:
+            ttype : str = iiif_data.get("type", "")
+            handler = import_transform_callables[ttype]
+        except KeyError as exc:
+            raise Exception("unsupported iiif transform type: %s" % str(exc))
+        return handler(iiif_data)
+        
+    def to_iiif_dict( self )  -> dict :
+        raise NotImplementedError() 
 
-def iiif_to_blender_transform( iiif_transform : dict ) -> Tuple[str,Vector|Quaternion]:
-    """
-    argument in: a dict from the json encoding of a RotateTransform, TranslateTransform
-    or ScaleTransform
+XYZ : List[str] = ["x" , "y" , "z"]
+
+class Translation(Transform):
+    def __init__(self, vec : Vector):
+        self.data : Vector = vec
+
+    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None:        
+        last:TransformSet = tsetList[-1]
+        last.translation = Translation( last.translation.data + self.data )
+            
+    def inverse(self) -> Translation:
+        return Translation( -1 * self.data )
+
+    def applyToCoordinate(self, coord : Vector ) -> Vector :
+        return coord + self.data
     
-    return: one of following
-    ("RotateTransform", Quaternion )
-    ("ScaleTransform" , Vector )
-    ("TranslateTransform" , Vector )
-    """
-    transformType:str = iiif_transform["type"]
-    default_value = (0.0,1.0)[transformType == SCALE_TRANSFORM]
-    def coordinates( transform ):
+    @staticmethod
+    def from_iiif_dict( iiif_data : dict )  -> Transform:
+        # 1. get the axes value, convention is that omitted axes are 0
+        iv = [ float(iiif_data.get(axis, 0.0)) for axis in XYZ]
+        
+        # Given the 
+        # Blender <- IIIF axes mapping: X <- X ; Y <- -Z ; Z <- Y
+        bv = [iv[0], -iv[2], iv[1]]
+        
+        vec = Vector(bv)
+        return Translation(vec)
+        
+    def to_iiif_dict( self ) -> dict:
+        
+        # 1. convert back to iiif axes under 
+        # iiif <- Blender axes mapping X <- X. Y <- Z; Z <- -Y
+        iv = [self.data.x, self.data.z, -self.data.y]
+        
+        # express as dictionary
+        retVal : Dict[str,Any] = {"type": TRANSLATE_TRANSFORM}
+        for label, v in zip( XYZ, iv):
+            if v != 0.0:
+                retVal[label] = v
+        return retVal
+        
+class Rotation(Transform):
+    def __init__(self, quat : Quaternion ):
+        self.data : Quaternion = quat
+        
+    def commuteWithTranslation( self, t : Translation ) -> Translation:
+        return  Translation( t.data.copy().rotate(self.data) )
+    
+    def isIdentity(self) -> bool :
+        return self.data.to_axis_angle()[1] == 0.0
+        
+    def inverse(self) -> Rotation:
+        return Rotation( self.data.inverted() )
+
+    def applyToCoordinate(self, coord : Vector ) -> Vector :
+        retVal = coord.copy()
+        retVal.rotate(self.data)
+        return retVal
+        
+    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None:        
+        last:TransformSet = tsetList[-1]
+        last.translation = self.commuteWithTranslation(last.translation)
+        
+        # Developer Note 8/11/2025: TODO: The Blender documentation is not
+        # clearly explicit about the 'transform orderering' that 
+        # the rotate method applies. It must be verified by explicit
+        # testing application to coordinate vectors. The intention is that
+        # the new_quaternion result on a coordinate should be:
+        # first, apply the last.rotation.data quaternion to the coordinte
+        # second: apply the self.data quaternion
+        new_quaternion = last.rotation.data.copy().rotate( self.data )
+        last.rotation  = Rotation( new_quaternion )
+        
+    @staticmethod
+    def from_iiif_dict( iiif_data : dict )  -> Transform:
+        # 1. get the axes value, convention is that omitted axes are 0
+        iv = [ float(iiif_data.get(axis, 0.0)) for axis in XYZ]
+        
+        # iiif_values are rotations in degrees, representing Euler rotation in
+        # XYZ intrinsic order, which ZYX in extrinsic order. Given the 
+        # Blender <- IIIF axes mapping: X <- X ; Y <- -Z ; Z <- Y
+        # also perform the conversion to radians
+        # these will then denote a Euler rotation in YZX extrinsic order
+        bv = [radians(d) for d in [iv[0], -iv[2], iv[1]]]
+        
+        quat:Quaternion = Euler(bv, "YZX").to_quaternion()
+        return Rotation(quat)
+        
+    def to_iiif_dict( self ) -> dict:
+        
+        # 1. convert to Euler rotation in YZX extrinsic order
+        euler:Euler = self.data.to_euler("YZX")
+        
+        # 2. convert back to iiif axes under 
+        # iiif <- Blender axes mapping X <- X. Y <- Z; Z <- -Y
+        iv = [degrees(r) for r in [euler.x, euler.z, -euler.y]]
+        
+        # express as dictionary
+        retVal : Dict[str,Any] = {"type": ROTATE_TRANSFORM}
+        for label, v in zip( XYZ, iv):
+            if v != 0.0:
+                retVal[label] = v
+        return retVal
+    
+    
+class Scaling(Transform):
+    def __init__(self, vec: Vector ):
+        self.data : Vector = vec
+        
+    def isIdentity(self) :
+        for s in self.data.to_tuple():
+            if s != 1.0:
+                return False
+        return True
+        
+    def commuteWithRotation( self, r: Rotation) -> Rotation:
+        raise NotImplementedError()
+           
+    def commuteWithTranslation( self, t : Translation ) -> Translation:
+        return Translation( self.data * t.data )
+        
+
+    def isUniform(self) -> bool :
         """
-        Pulls out coordinates in x,y,z order, allowing for missing
-        components that are filled in with default 0.0
+        returns true only if all components of scaling have same absolute values
+        The significance of this is that if the scaling is not uniform, then the
+        commutator with a non-zero rotation cannot be expresses as a Rotation, Scaling,
+        or Translation
         """
-        for axis in AXIS_KEYS:
-            yield float( transform.get(axis,default_value))
-    iiif_vector = Vector(list(coordinates( iiif_transform )))
-    
-    
-    if transformType == ROTATE_TRANSFORM:
+        s = abs(self.data[0])
+        for i in range(1,3):
+            if abs(self.data[i]) != s:
+                return False
+        else:
+            return True
+            
+    # developer note: 11 Aug 2025 : As this code has been developed the need
+    # for an explicit calculation has disappeared; as the commutation with translation
+    # is done explicitly with the scale data, while the commutation with rotation
+    # does not depend on the value of parity.
+    def parity(self) -> int :
         """
-        the iiif_vector represents the angles in degrees, for ccw rotations about
-        the intrinsic axea in XYZ order. That Euler rotation is equal to the rotation
-        about the extrinsic axes in ZYX order, of the following rotation in Euler
-        axes
+        returns -1 if the scaling transform includes a reflection in 1 axis
+        or all axes.
         """
-        blender_angles = (   radians(iiif_vector.x),
-                            -radians(iiif_vector.z),
-                             radians(iiif_vector.y))
-                             
-        
-        quat = Euler( blender_angles, BLENDER_EULER_ORDER).to_quaternion()
-        return (ROTATE_TRANSFORM, quat)
-        
-    elif transformType == SCALE_TRANSFORM:
-        blender_scales = ( iiif_vector.x, iiif_vector.z, iiif_vector.y)
-        return (SCALE_TRANSFORM, Vector(blender_scales))
-        
-    elif transformType == TRANSLATE_TRANSFORM:
-        blender_components = ( iiif_vector.x, -iiif_vector.z, iiif_vector.y)
-        return (TRANSLATE_TRANSFORM, Vector(blender_components))
-        
-    raise ValueError(f"transformType : {transformType}")
-    
-    
-def blender_to_iiif_transform( blender_transform : Tuple[str, Vector|Quaternion])  -> Dict[str,Any]:
-    """
-    """
-    retVal : Dict[str,Any] = {}
-    transformType = blender_transform[0]
-    if transformType == ROTATE_TRANSFORM:
-        if not isinstance( blender_transform[1], Quaternion):
-            raise Exception(f"blender_to_iiif_transform: invalid transform data for {transformType}")
-        quat: Quaternion = blender_transform[1]
-        euler:Euler = quat.to_euler(BLENDER_EULER_ORDER)
-        
-        iiif_angles_radians=(euler.x, euler.z, -euler.y)
-        retVal["type"] = ROTATE_TRANSFORM
+        acc = +1
         for i in range(3):
-            if abs( iiif_angles_radians[i] ) > TINY_VALUE:
-                retVal[ AXIS_KEYS[i]]=degrees(iiif_angles_radians[i])
-    
-    else:
-        if not isinstance( blender_transform[1], Vector):
-            raise Exception(f"blender_to_iiif_transform: invalid transform data for {transformType}")
-        blender_vec : Vector =  blender_transform[1]  
-        iiif_components = Vector((blender_vec.x,blender_vec.z,-blender_vec.y))
-                    
-        if transformType == TRANSLATE_TRANSFORM:
-            retVal["type"] = TRANSLATE_TRANSFORM
-            for i in range(3):
-                if abs( iiif_components[i] ) > TINY_VALUE:
-                    retVal[ AXIS_KEYS[i]]=iiif_components[i]
+            if self.data[i] < 0:
+                acc *= -1
+        return acc
+        
+    def rotationComponent(self) -> Rotation :
+        pos_axes : Set[int] = set()
+        neg_axes : Set[int] = set()
+        for i in range(3):
+            if self.data[i] < 0:
+                neg_axes.add(i)
+            else:
+                pos_axes.add(i)
+        if len(pos_axes) in (0,3):
+            return Rotation(Quaternion()) # the identity, zero rotation
 
-        elif transformType == SCALE_TRANSFORM:
-            retVal["type"] = SCALE_TRANSFORM 
-            for i in range(3):
-                if iiif_components[i] <= 0.0 or log( iiif_components[i] ) > TINY_VALUE:
-                    retVal[ AXIS_KEYS[i]]=iiif_components[i]
+        rotation_axis = Vector()
+        if len(pos_axes) == 1:
+            rotation_axis[list(pos_axes)[0]] = 1.0
+        else:
+            rotation_axis[list(neg_axes)[0]] = 1.0
+        return Rotation(Quaternion( rotation_axis, pi) )
+
+    def inverse(self) -> Scaling:        
+        try:
+            return  Scaling( Vector(list(map( lambda x : 1.0/x, self.data.to_tuple() ))))
+        except ZeroDivisionError:
+            raise
+            
+    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None: 
+        # following is the test of whether this scale transformation
+        # can be commuted with the previous Rotation
+        last:TransformSet = tsetList[-1]
+        if self.isUniform() or last.rotation.isIdentity():            
+            last.translation = self.commuteWithTranslation(last.translation)
+            last.rotation = self.commuteWithRotation(last.rotation)
+            last.scale = Scaling( last.scale.data * self.data )
+        else:
+            newSet:TransformSet = TransformSet()
+            newSet.scale = Scaling(self.data.copy())
+            tsetList.append(newSet)
+
+    @staticmethod
+    def from_iiif_dict( iiif_data : dict )  -> Scaling:
+        # 1. get the axes value, convention is that omitted axes are 1
+        iv = [ float(iiif_data.get(axis, 1.0)) for axis in XYZ]
+        
+        # Given the 
+        # Blender <- IIIF axes mapping: X <- X ; Y <- -Z ; Z <- Y
+        bv = [iv[0], iv[2], iv[1]]
+        
+        vec = Vector(bv)
+        return Scaling(vec)
+        
+    def to_iiif_dict( self ) -> dict:
+        
+        # 1. convert back to iiif axes under 
+        # iiif <- Blender axes mapping X <- X. Y <- Z; Z <- -Y
+        iv = [self.data.x, self.data.z,self.data.y]
+        
+        # express as dictionary
+        retVal : Dict[str,Any] = {"type": SCALE_TRANSFORM}
+        for label, v in zip( XYZ, iv):
+            if v != 1.0:
+                retVal[label] = v
+        return retVal
+        
+
+class TransformSet:
+    def __init__(self):
+        self.scale : Scaling = Scaling(Vector((1,1,1)))
+        self.rotation : Rotation = Rotation(Quaternion((0,0,0,0)))
+        self.translation : Translation = Translation(Vector((0,0,0)))
+        
+    def isIdentity(self) -> bool :
+        return  self.scale.isIdentity() and \
+                self.rotation.isIdentity() and \
+                self.translation.isIdentity()
+        
+def ReduceTransforms( transforms:Sequence[Transform]) -> List[TransformSet]:
+    retVal:List[TransformSet] = [ TransformSet() ]
+    for transform in transforms:
+        transform.applyToTransformSetList(retVal)
     return retVal
 
 
-def decompose_scaling_vector( vec: Vector ) -> Tuple[int,float,Optional[Quaternion], Optional[Vector]]:
-    """
-    element 0 : +1 or -1
-    elemrnt 1 : a uniform scaling  >= 0 . If this element = 0, it it makes all further calculations 
-                irrelevant, the model is reduced to a point. This will only return when all
-                the components of vec are 0.0
-    element 2 : This is a rotation by 180 degrees around an axis to allowing to negate
-                two of the scaling components.
-    element 3 : if present, this is nonuniform scaling by non-negative values.
-    """
-    neg_scaled_axes :Set[int] = set()
-    zero_scaled_axes:Set[int] = set()
-    pos_scaled_axes :Set[int] = set()
-    all_axes        :Set[int] = set(range(3))
-    
-    for i in range(3):
-        if vec[i] == 0.0:
-            zero_scaled_axes.add(i)
-        elif vec[i] < 0.0:
-            neg_scaled_axes.add(i)
-        else:
-            pos_scaled_axes.add(i)
-            
-    parity : int = +1
-    uniform_scale : float = 0.0
-    rotation : Optional[Quaternion] = None
-    nonuniform_scale : Optional[Vector] = Vector()
-    
-    if  len(zero_scaled_axes) != 3:
-        if len( neg_scaled_axes ) in (1,2):
-            if len(neg_scaled_axes) == 1:
-                rotation_axis_index = list(neg_scaled_axes)[0]
-            else:
-                rotation_axis_index = list(all_axes - neg_scaled_axes)[0]
-            rotation_axis = Vector()
-            rotation_axis[rotation_axis_index] = 1.0
-            rotation = Quaternion( rotation_axis, radians(180))
-            
-        if len( neg_scaled_axes ) in (1,3):
-            parity = -1
-            
-        abs_vec = Vector( [abs(x) for x in vec])
-        for i in range(1,3):
-            if abs_vec[i] != abs_vec[0]:
-                uniform_scale = 1.0
-                nonuniform_scale = abs_vec
-            else:
-                uniform_scale = abs_vec[0]
-    return (parity, uniform_scale, rotation, nonuniform_scale)
-        
-    
-    
-        
-        
-    
+import_transform_callables : Dict[str,Callable] = {
+    ROTATE_TRANSFORM :    Rotation.from_iiif_dict,
+    TRANSLATE_TRANSFORM : Translation.from_iiif_dict,
+    SCALE_TRANSFORM :     Scaling.from_iiif_dict
+}        
