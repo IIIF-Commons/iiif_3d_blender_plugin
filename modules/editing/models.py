@@ -1,9 +1,9 @@
 import json
 from bpy.types import Object
-from typing import Set, Tuple
+from typing import  Tuple
 from mathutils import Vector, Quaternion
 
-from ..utils.coordinates import Coordinates
+from .transforms import Placement
 
 import logging
 logger = logging.getLogger("iiif.models")
@@ -23,7 +23,7 @@ INITIAL_TRANSFORM="iiif.initial.transform"
 
 def configure_model(    new_model : Object,
                         resource_data  : dict,
-                        placement_data : dict ) -> None :
+                        placement      : Placement ) -> None :
     """
     Initialize the custom properties of the Blender object
     and set the Blender location, rotation, scale properties
@@ -36,7 +36,7 @@ def configure_model(    new_model : Object,
     resource_data must contain an "id" value
     
     """
-    logger.debug(f"configure_model : placement_data : {repr(placement_data)}")
+    logger.debug(f"configure_model : placement : {repr(placement)}")
     try:
         model_id = resource_data["id"]
     except KeyError:
@@ -52,7 +52,7 @@ def configure_model(    new_model : Object,
         pass
     else:
         if existing_type != MODEL:
-            logger.warn
+            logger.warn("TODO: fix this message")
             
     if IIIF_TEMP_FORMAT in new_model:
         mimetype = new_model[IIIF_TEMP_FORMAT]
@@ -61,21 +61,12 @@ def configure_model(    new_model : Object,
             logger.warn(message)
     new_model["iiif_type"] = "Model"
     new_model["iiif_json"] = json.dumps(resource_data)
-    if placement_data is not None:
-        if "location" in placement_data:
-            new_model.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
-         
-        if "rotation" in placement_data:
-            saved_mode = new_model.rotation_mode
-            try:
-                euler = Coordinates.model_transform_angles_to_blender_euler( placement_data["rotation"] )
-                new_model.rotation_mode = euler.order
-                new_model.rotation_euler = euler
-            finally:
-                new_model.rotation_mode = saved_mode            
-        
-        if "scale" in placement_data:
-            new_model.scale = Vector( placement_data["scale"] )
+
+    new_model.location = placement.translation.data
+    new_model.rotation_mode = "QUATERNION"
+    new_model.rotation_quaternion = placement.rotation.data
+    new_model.scale = placement.scaling.data
+    
     return    
 
 

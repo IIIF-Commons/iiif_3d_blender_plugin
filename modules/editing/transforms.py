@@ -1,5 +1,5 @@
 from __future__ import annotations
-from  typing import  Set,  Any, Dict, List, Sequence, Callable
+from  typing import  Any, Dict, List,  Callable, Generator, Iterable
 from mathutils import Vector, Quaternion, Euler
 from math import radians, degrees,   pi
 
@@ -17,6 +17,7 @@ logger = logging.getLogger("editing.transforms")
 ROTATE_TRANSFORM    = "RotateTransform"
 SCALE_TRANSFORM     = "ScaleTransform"
 TRANSLATE_TRANSFORM = "TranslateTransform"
+POINT_SELECTOR      = "PointSelector"
 
 
 
@@ -31,7 +32,7 @@ class Transform:
     def applyToCoordinate(self, coord : Vector ) -> Vector :
         raise NotImplementedError()
         
-    def applyToTransformSetList(self, tset : List[TransformSet]) -> None:
+    def applyToPlacement(self,placement:Placement) -> bool:
         raise NotImplementedError() 
         
     @staticmethod
@@ -52,12 +53,18 @@ class Translation(Transform):
     def __init__(self, vec : Vector):
         self.data : Vector = vec
 
-    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None:        
-        last:TransformSet = tsetList[-1]
-        last.translation = Translation( last.translation.data + self.data )
+    def applyToPlacement(self,placement:Placement) -> bool:        
+        placement.translation = Translation( placement.translation.data + self.data )
+        return True
             
     def inverse(self) -> Translation:
         return Translation( -1 * self.data )
+        
+    def isIdentity(self) -> bool :
+        for val in self.data.to_tuple():
+            if val != 0.0:
+                return False
+        return True
 
     def applyToCoordinate(self, coord : Vector ) -> Vector :
         return coord + self.data
@@ -92,32 +99,25 @@ class Rotation(Transform):
         self.data : Quaternion = quat
         
     def commuteWithTranslation( self, t : Translation ) -> Translation:
-        return  Translation( t.data.copy().rotate(self.data) )
+        return  Translation(self.data @ t.data )
+        
     
+    def commuteWithRotation( self, r : Rotation ) -> Rotation:
+        return  Rotation( self.data @ r.data @ self.data.inverted() )
+        
     def isIdentity(self) -> bool :
-        return self.data.to_axis_angle()[1] == 0.0
+        return self.data.angle == 0.0
         
     def inverse(self) -> Rotation:
         return Rotation( self.data.inverted() )
 
     def applyToCoordinate(self, coord : Vector ) -> Vector :
-        retVal = coord.copy()
-        retVal.rotate(self.data)
-        return retVal
+        return self.data @ coord
         
-    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None:        
-        last:TransformSet = tsetList[-1]
-        last.translation = self.commuteWithTranslation(last.translation)
-        
-        # Developer Note 8/11/2025: TODO: The Blender documentation is not
-        # clearly explicit about the 'transform orderering' that 
-        # the rotate method applies. It must be verified by explicit
-        # testing application to coordinate vectors. The intention is that
-        # the new_quaternion result on a coordinate should be:
-        # first, apply the last.rotation.data quaternion to the coordinte
-        # second: apply the self.data quaternion
-        new_quaternion = last.rotation.data.copy().rotate( self.data )
-        last.rotation  = Rotation( new_quaternion )
+    def applyToPlacement(self,placement:Placement) -> bool:        
+        placement.translation = self.commuteWithTranslation(placement.translation)
+        placement.rotation  = Rotation( self.data @ placement.rotation.data )
+        return True
         
     @staticmethod
     def from_iiif_dict( iiif_data : dict )  -> Transform:
@@ -162,7 +162,11 @@ class Scaling(Transform):
         return True
         
     def commuteWithRotation( self, r: Rotation) -> Rotation:
-        raise NotImplementedError()
+        if (r.isIdentity() or self.isUniform()):
+            rotationPart:Rotation = self.rotationComponent()
+            return rotationPart.commuteWithRotation(r)
+        else:
+            raise NotImplementedError()
            
     def commuteWithTranslation( self, t : Translation ) -> Translation:
         return Translation( self.data * t.data )
@@ -198,21 +202,21 @@ class Scaling(Transform):
         return acc
         
     def rotationComponent(self) -> Rotation :
-        pos_axes : Set[int] = set()
-        neg_axes : Set[int] = set()
+        pos_axes = list()
+        neg_axes = list()
         for i in range(3):
             if self.data[i] < 0:
-                neg_axes.add(i)
+                neg_axes.append(i)
             else:
-                pos_axes.add(i)
+                pos_axes.append(i)
         if len(pos_axes) in (0,3):
             return Rotation(Quaternion()) # the identity, zero rotation
 
-        rotation_axis = Vector()
+        rotation_axis : List[float]= [0.0,0.0,0.0]
         if len(pos_axes) == 1:
-            rotation_axis[list(pos_axes)[0]] = 1.0
+            rotation_axis[pos_axes[0]] = 1.0
         else:
-            rotation_axis[list(neg_axes)[0]] = 1.0
+            rotation_axis[neg_axes[0]] = 1.0
         return Rotation(Quaternion( rotation_axis, pi) )
 
     def inverse(self) -> Scaling:        
@@ -221,18 +225,15 @@ class Scaling(Transform):
         except ZeroDivisionError:
             raise
             
-    def applyToTransformSetList(self,tsetList: List[TransformSet]) -> None: 
+    def applyToPlacement(self,placement:Placement) -> bool: 
         # following is the test of whether this scale transformation
         # can be commuted with the previous Rotation
-        last:TransformSet = tsetList[-1]
-        if self.isUniform() or last.rotation.isIdentity():            
-            last.translation = self.commuteWithTranslation(last.translation)
-            last.rotation = self.commuteWithRotation(last.rotation)
-            last.scale = Scaling( last.scale.data * self.data )
-        else:
-            newSet:TransformSet = TransformSet()
-            newSet.scale = Scaling(self.data.copy())
-            tsetList.append(newSet)
+        if self.isUniform() or placement.rotation.isIdentity():            
+            placement.translation = self.commuteWithTranslation(placement.translation)
+            placement.rotation = self.commuteWithRotation(placement.rotation)
+            placement.scaling = Scaling( placement.scaling.data * self.data )
+            return True
+        return False
 
     @staticmethod
     def from_iiif_dict( iiif_data : dict )  -> Scaling:
@@ -260,26 +261,39 @@ class Scaling(Transform):
         return retVal
         
 
-class TransformSet:
+class Placement:
     def __init__(self):
-        self.scale : Scaling = Scaling(Vector((1,1,1)))
+        self.scaling :  Scaling = Scaling(Vector((1,1,1)))
         self.rotation : Rotation = Rotation(Quaternion((0,0,0,0)))
         self.translation : Translation = Translation(Vector((0,0,0)))
         
     def isIdentity(self) -> bool :
-        return  self.scale.isIdentity() and \
+        return  self.scaling.isIdentity() and \
                 self.rotation.isIdentity() and \
                 self.translation.isIdentity()
+                
+    def to_transform_list(self) -> List[Transform]:
+        return [self.scaling, self.rotation, self.translation]
         
-def ReduceTransforms( transforms:Sequence[Transform]) -> List[TransformSet]:
-    retVal:List[TransformSet] = [ TransformSet() ]
+def transformsToPlacements( transforms:Iterable[Transform]) -> Generator[Placement]:
+    accum : Placement = Placement()
     for transform in transforms:
-        transform.applyToTransformSetList(retVal)
-    return retVal
+        if not transform.isIdentity():
+            if transform.applyToPlacement(accum):
+                continue
+            else:
+                yield accum
+                accum = Placement()
+                transform.applyToPlacement(accum)
+    if not accum.isIdentity():
+        yield accum
+            
 
 
 import_transform_callables : Dict[str,Callable] = {
     ROTATE_TRANSFORM :    Rotation.from_iiif_dict,
     TRANSLATE_TRANSFORM : Translation.from_iiif_dict,
-    SCALE_TRANSFORM :     Scaling.from_iiif_dict
+    POINT_SELECTOR      : Translation.from_iiif_dict,
+    SCALE_TRANSFORM :     Scaling.from_iiif_dict,
+    
 }        

@@ -1,7 +1,7 @@
 
 import json
 
-from typing import Set, Callable
+from typing import Set, Callable, Iterable
 
 import bpy
 from bpy.props import StringProperty
@@ -17,13 +17,13 @@ from .editing.collections import (  new_manifest,
                                     ANNOTATION_TYPE,
                                     ANNOTATIONPAGE_TYPE,
                                     SCENE_TYPE)
+                                    
+from .editing.transforms import Transform, Placement, transformsToPlacements
 
 from .utils.color import hex_to_rgba
 from .utils.json_patterns import (
     force_as_object,
-    force_as_singleton,
-    force_as_list,
-    axes_named_values,
+    force_as_singleton
 )
 
 
@@ -68,6 +68,7 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             self.process_manifest(self.manifest_data)
             return {"FINISHED"}
         except Exception as e:
+            raise
             self.report({"ERROR"}, f"Error reading manifest: {str(e)}")
             return {"CANCELLED"}
 
@@ -177,8 +178,8 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         """     
         # placement_data is a dictionary whose entries will be filled with 
         # values from target and body, if either or both are SpecificResources   
-        placement_data = self.get_object_placement(body_data, target_data)
-        logger.debug(f"body_to_object : placement_data : {repr(placement_data)}")
+        placement:Placement = self.get_object_placement(body_data, target_data)
+        
         
         if body_data["type"] == "SpecificResource":
             resource_data = force_as_object(
@@ -189,19 +190,20 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
         resource_type :str = resource_data["type"]
         if resource_type == "Model":
-            return self.resource_data_to_model(resource_data, placement_data)
+            return self.resource_data_to_model(resource_data, placement)
         elif resource_type in ("PerspectiveCamera",):
-            return self.resource_data_to_camera(resource_data, placement_data)
+            return self.resource_data_to_camera(resource_data, placement)
         raise ImportManifestError("Resource type %s not supported for annotation body" % resource_type)
 # 
-    def resource_data_to_model(self, resource_data, placement_data) -> Object:
+    def resource_data_to_model(self, resource_data : dict, placement : Placement) -> Object:
         """
         download, create, and configure model object
         """
         from .editing.models import configure_model
         
-        model_url = resource_data.get("id", None)
-        if model_url is None:
+        try:
+            model_url = resource_data["id"]
+        except KeyError:
             raise ImportManifestError("no url for model provided")
         mimetype = resource_data.get("format","")
         _op : Callable[..., Set[str]] = bpy.ops.iiif.import_network_model # pyright:ignore[reportAttributeAccessIssue]
@@ -214,10 +216,10 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         if new_model is None:
             raise ImportManifestError("bpy.context.active_object not set")
         
-        configure_model(new_model, resource_data,  placement_data)
+        configure_model(new_model, resource_data,  placement)
         return new_model
          
-    def resource_data_to_camera(self, resource_data, placement_data) -> Object:
+    def resource_data_to_camera(self, resource_data, placement) -> Object:
         """
         create, and configure camera object
         """
@@ -233,48 +235,48 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
             raise  ImportManifestError("failed to add camera")
             
         configure_camera(   new_camera,
-                            resource_data = resource_data, 
-                            placement_data =  placement_data)
+                            resource_data,
+                            placement)
         return new_camera
         
 
     
-    def get_object_placement(self, body_data:dict , target_data : dict):
+    def get_object_placement(self, body_data:dict , target_data : dict) -> Placement:
         """
         examines the content of target_data dictionary and identify if
         properties of the target determine information on placement of model 
         in the Blender scene
         
-        At this implementation the case of the target_data representing a SpecificResource
-        with a PointSelector will be handled.
-        
-        value of the location property will be set with a 3-tuple in IIIIF Coordinates       
-        
-        examines the content of body_data dictionary and identify if
-        properties of the body determine information on placement of model 
-        in the Blender scene
-        
-        At this implementation the case of the target_data representing a SpecificResource
-        with a transform property
-        
-        value of the rotation and scale property will be set with a 3-tuple in IIIIF Coordinates 
+        Will always return a not None value, if no Transforms are in the body_data
+        or target_data, the return value will be the identity Placement
         """
         
-        placement_data = {}
-        logger.debug(f'get_object_placement : body_data {repr(body_data)}')
-        if  body_data["type"] == "SpecificResource" and \
-            body_data.get("transform", False):
-            for transform in force_as_list(body_data["transform"]):
-                for transform_compare, placement_property in (
-                    ("RotateTransform","rotation"),
-                    ("ScaleTransform","scale"),
-                ):
-                    if transform["type"] == transform_compare:
-                        placement_data[placement_property] = axes_named_values(transform)
+        def iiif_transforms() -> Iterable[dict]:
+            """
+            generator yielding editing.Transform nodes
+            """
+            if  body_data.get("type","") == "SpecificResource":
+                for iiif_transform in body_data.get("transform",""):
+                    yield iiif_transform
 
-        if  target_data["type"] == "SpecificResource":
-            sel = force_as_singleton( target_data["selector"] )
-            if sel and sel["type"] == "PointSelector":
-                placement_data["location"] = axes_named_values( sel )
-        return placement_data
+            if  target_data.get("type","") == "SpecificResource":
+                selector = force_as_singleton( target_data["selector"] )
+                if selector and selector.get("type","") == "PointSelector":
+                    yield selector
+                    
+        placements = list(
+            transformsToPlacements(                               
+                    map(Transform.from_iiif_dict, iiif_transforms())
+            )
+        )
+        
+        if len(placements) == 0:
+            return Placement()
+        elif len(placements) == 1:
+            return placements[0]
+        else:
+            raise Exception()
+        
+        
+            
         

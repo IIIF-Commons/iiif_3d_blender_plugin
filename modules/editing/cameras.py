@@ -1,41 +1,47 @@
 import json
 import math
 from bpy.types import Object
-import typing
+from mathutils import Quaternion
+
+from typing import List
 
 from . import generate_id
-from ..utils.coordinates import Coordinates
 from ..utils.json_patterns import force_as_singleton
+from ..editing.transforms import Transform, Rotation, Placement, transformsToPlacements
 
 import logging
 logger = logging.getLogger("iiif.cameras")
 logger.setLevel(logging.INFO)
 
-def configure_camera(   new_camera : Object,
-                        *,                                                  
-                        resource_data : typing.Optional[dict] = None,
-                        placement_data : typing.Optional[dict] = None) -> None :
-    data:dict = resource_data or _initial_data()
-    data["id"] = data.get("id", None) or generate_id("perspectivecamera")
+def configure_camera(   new_camera : Object,                                                 
+                        resource_data : dict,
+                        placement : Placement ) -> None:
+    if len(resource_data) == 0:
+        resource_data = _initial_data()
+        resource_data["id"]=generate_id(resource_data["type"])
+        
+    if "type" not in resource_data:
+        logger.warn("camera type not specified")
 
-    if "fieldOfView" in data:
-        foV = force_as_singleton(data["fieldOfView"])
+    if "fieldOfView" in resource_data:
+        foV = force_as_singleton(resource_data["fieldOfView"])
         if foV is not None: 
             new_camera.data.angle_y = math.radians( float( foV )) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-            del data["fieldOfView"]
+            del resource_data["fieldOfView"]
         
     
-    new_camera["iiif_type"] = "PerspectiveCamera"
-    new_camera["iiif_json"] = json.dumps(data)
+    new_camera["iiif_type"] = resource_data["type"]
+    new_camera["iiif_json"] = json.dumps(resource_data)
     
-    if placement_data is not None:
-        if placement_data["location"] is not None:
-            new_camera.location = Coordinates.iiif_position_to_blender_vector( placement_data["location"] )
-            
-        if placement_data["rotation"] is not None:
-            euler = Coordinates.camera_transform_angles_to_blender_euler( placement_data["rotation"] )
-            new_camera.rotation_mode = euler.order
-            new_camera.rotation_euler = euler
+    new_camera.location = placement.translation.data
+     
+    initial_camera_rotation : List[Transform]  = [ Rotation(Quaternion( (1.0,0.0,0.0), math.pi/2)) ]
+    full_camera_transforms : List[Transform]   =  initial_camera_rotation   + placement.to_transform_list()
+
+    full_camera_placement = list( transformsToPlacements(   full_camera_transforms ) )                           
+
+    new_camera.rotation_mode = "QUATERNION"
+    new_camera.rotation_quaternion = full_camera_placement[0].rotation.data # pyright: ignore[reportAttributeAccessIssue]
 
     # set the "units" for the camera field to be "FOV", this 
     # gives a more useful UI for adjusting the focal length of the
