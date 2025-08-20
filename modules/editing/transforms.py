@@ -93,7 +93,10 @@ class Translation(Transform):
             if v != 0.0:
                 retVal[label] = v
         return retVal
-        
+
+    def __repr__(self):
+        return "Translation(%r)" % repr(self.data)   
+                
 class Rotation(Transform):
     def __init__(self, quat : Quaternion ):
         self.data : Quaternion = quat
@@ -149,7 +152,9 @@ class Rotation(Transform):
             if v != 0.0:
                 retVal[label] = v
         return retVal
-    
+
+    def __repr__(self):
+        return "Rotation(%r)" % repr(self.data)    
     
 class Scaling(Transform):
     def __init__(self, vec: Vector ):
@@ -260,12 +265,15 @@ class Scaling(Transform):
                 retVal[label] = v
         return retVal
         
+    def __repr__(self):
+        return "Scaling(%r)" % repr(self.data)
+        
 
 class Placement:
-    def __init__(self):
-        self.scaling :  Scaling = Scaling(Vector((1,1,1)))
-        self.rotation : Rotation = Rotation(Quaternion((0,0,0,0)))
-        self.translation : Translation = Translation(Vector((0,0,0)))
+    def __init__(self, scaling=None, rotation=None, translation=None):
+        self.scaling :  Scaling = scaling or Scaling(Vector((1,1,1)))
+        self.rotation : Rotation = rotation or Rotation(Quaternion((1,0,0),0.0))
+        self.translation : Translation = translation or Translation(Vector((0,0,0)))
         
     def isIdentity(self) -> bool :
         return  self.scaling.isIdentity() and \
@@ -274,7 +282,10 @@ class Placement:
                 
     def to_transform_list(self) -> List[Transform]:
         return [self.scaling, self.rotation, self.translation]
-        
+
+    def __repr__(self):
+        return "Placement( %r, %r, %r)" % (self.scaling, self.rotation, self.translation)
+              
 def transformsToPlacements( transforms:Iterable[Transform]) -> Generator[Placement]:
     accum : Placement = Placement()
     for transform in transforms:
