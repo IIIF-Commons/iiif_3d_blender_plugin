@@ -2,7 +2,7 @@ from __future__ import annotations
 from  typing import  Any, Dict, List,  Callable, Generator, Iterable
 from mathutils import Vector, Quaternion, Euler
 from math import radians, degrees,   pi
-
+from bpy.types import Object
 
 # Dev Note: 9 Aug 2025
 # this import of annotations will allow the type hint system
@@ -307,4 +307,31 @@ import_transform_callables : Dict[str,Callable] = {
     POINT_SELECTOR      : Translation.from_iiif_dict,
     SCALE_TRANSFORM :     Scaling.from_iiif_dict,
     
-}        
+}      
+
+def get_object_placement( blender_obj : Object ) -> Placement:
+
+    saved_mode = blender_obj.rotation_mode 
+    try:
+        blender_obj.rotation_mode = "QUATERNION"
+        quat = blender_obj.rotation_quaternion
+        return Placement(
+                    scaling = Scaling(blender_obj.scale.copy()),
+                    rotation = Rotation( quat.copy() ),
+                    translation = Translation(blender_obj.location.copy())
+                    )        
+    finally:
+        blender_obj.rotation_mode = saved_mode
+        
+def set_object_placement( blender_obj : Object , placement : Placement) -> None:
+
+    saved_mode = blender_obj.rotation_mode 
+    try:
+        blender_obj.rotation_mode = "QUATERNION"
+        blender_obj.rotation_quaternion = placement.rotation.data.copy()
+        blender_obj.scale = placement.scaling.data
+        blender_obj.location = placement.translation.data.copy()
+    finally:
+        blender_obj.rotation_mode = saved_mode
+
+
