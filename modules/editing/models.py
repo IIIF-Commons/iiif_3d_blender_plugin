@@ -1,7 +1,7 @@
 import json
 from bpy.types import Object
-from typing import  Tuple
-from mathutils import Vector, Quaternion
+#from typing import  Tuple
+#from mathutils import Vector, Quaternion
 
 from .transforms import Placement
 
@@ -91,28 +91,22 @@ def mimetype_from_extension( fname: str ) -> str:
     except KeyError:
         return ""
         
-def encode_blender_transform(location : Vector, rotation : Quaternion, scale : Vector ) -> str:
+def encode_blender_placement( placement : Placement ) -> str:
     """
     encode the 3 values used in Blender object into a string that can be stored
     as a Blender custom property, and decoded back into the original values
     
-    encoding strategy: encode as the string representation of a 3-tuple,
-    each element of the tuple is the string returned by the repr() value
-    of a Blender python API object
+    uses the repr function to encode
     """
-    
-    argTuple = tuple( [ repr(s) for s in [location, rotation, scale ]])
-    return repr( argTuple )
+    return repr(placement)
     
 
-def decode_blender_transform( encoding : str ) -> Tuple[Vector, Quaternion, Vector]:
+def decode_blender_transform( encoding : str ) -> Placement:
     """
     reverses the encoding performed by function encode_blender_transform
     """
     try:
-        argTuple = eval(encoding)
-        retVal = tuple( [eval(s) for s in argTuple])
+        return eval( encoding )
     except Exception:
         logger.error(f"unable to decode transform: {repr(encoding)}")
-        return (Vector(), Quaternion(), Vector())
-    return retVal
+        return Placement()
