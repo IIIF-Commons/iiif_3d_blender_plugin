@@ -1,16 +1,13 @@
 import json
-from typing import Set
+from typing import Set, List
 
 import bpy
 from bpy.props import StringProperty
-from bpy.types import Context, Operator
+from bpy.types import Context, Operator, Object
 from bpy_extras.io_utils import ExportHelper
+from mathutils import Vector, Quaternion
 
 from .utils.color import rgba_to_hex
-from .utils.coordinates import Coordinates
-from .utils.json_patterns import (
-    create_axes_named_values
-)
 
 from .editing.collections import (getScenes, 
                     getTargetScene, 
@@ -18,6 +15,15 @@ from .editing.collections import (getScenes,
                     getAnnotationPages,
                     getBodyObject,
                     getManifests)
+                    
+from editing.transforms import Transform, Placement, Rotation, get_object_placement
+     
+#   INITIAL_TRANSFORM is string-valued constant
+#   shared with the models module, it is used as the
+#   key for storing the Blender placement (location, rotation, scale ) 
+#   that the model had on import from glTF         
+from .editing.models import INITIAL_TRANSFORM, decode_blender_transform
+
 from .utils.blender_setup import get_scene_background_color
 
 import math
@@ -54,8 +60,10 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         Design intent is that client will start with this base_data dict
         and then add and or modify properties which are determined by
         the Blender data structure
+        
+        label properties, metadata, and other none - 3d properties
+        will be in stored restored in the this base_data dict. 
         """
-        import json
         base_json = iiif_object.get("iiif_json",None)
         if base_json:
             base_data = json.loads( base_json )
@@ -113,34 +121,59 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         bodyObj = getBodyObject(anno_collection)
         
         if bodyObj is not None:
-            anno_data["target"] = self.target_data_for_object(bodyObj, anno_collection)
-            anno_data["body"]= self.body_data_for_object(bodyObj, anno_collection)
+            resource_data = self.resource_data_for_object( bodyObj )
+            transforms    = self.applied_transforms_for_object( bodyObj )
+            anno_data["target"] = self.target_data_for_object(  resource_data, 
+                                                                transforms, 
+                                                                anno_collection)
+                                                                
+            anno_data["body"]= self.body_data_for_object(   resource_data, 
+                                                            transforms,
+                                                            anno_collection)
 
         return anno_data
 
 
 
-    def body_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
-        resource_data = self.resource_data_for_object(blender_obj, anno_collection)
-        return self.specific_data_for_object(blender_obj, resource_data, anno_collection)
+    def body_data_for_object(self,  resource_data:dict, 
+                                    transforms: List[Transform], 
+                                    anno_collection:bpy.types.Collection) -> dict:
+        
+        # will use the logic that the final transform of the list, if it is a 
+        # Translation, will be encoded in the target. The remaining transforms will
+        # be simplified to list of placements, and then converted back to a list of
+        # transforms and then iiif Tranform resources
+        return {}
+        
+    def target_data_for_object(self,    resource_data:dict, 
+                                        transforms: List[Transform], 
+                                        anno_collection:bpy.types.Collection) -> dict:
+        target = getTargetScene( anno_collection )
+        return {
+            "id": target["iiif_id"]
+        }
 
-    def resource_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+
+    def resource_data_for_object(self, blender_obj:bpy.types.Object) -> dict:
         """
         returns the IIIF data for a Model, Camera, Light that is not position or orientation
         description; this would be the body data if no Transform were needed for orientation
         and scale.
         """
-        resource_type = blender_obj.get("iiif_type")
-        logger.info("getting resource data for %s" % resource_type)
-        if resource_type == "Model":
-            return self.resource_data_for_model(blender_obj, anno_collection)
-        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
-            return self.resource_data_for_camera(blender_obj, anno_collection)
-        else:
-            logger.error("type %s unsupported for export" % resource_type )
-            return {}
+        resource_type = blender_obj.get("iiif_type","")
+        logger.debug("getting resource data for %s" % resource_type)
+        
+        try:
+            return {
+                "Model" :               self.resource_data_for_model,
+                "PerspectiveCamera" :   self.resource_data_for_camera,
+                "OrthographicCamera" :  self.resource_data_for_camera,
+            }[blender_obj.get("iiif_type","")](blender_obj)
+        except KeyError as badKey:
+            logger.error(f"unsupported type {repr(badKey)} in resource_data_for_object")
+            raise
 
-    def resource_data_for_camera(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+    def resource_data_for_camera(self, blender_obj:bpy.types.Object) -> dict:
         resource_data = self.get_base_data(blender_obj)
         
         # July 3 2025 : We do not want to output an id for cameras that look like URLS
@@ -153,140 +186,116 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         resource_data["fieldOfView"] =  math.degrees(foValue) 
         return resource_data
         
-    def resource_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+    def resource_data_for_model(self, blender_obj:bpy.types.Object) -> dict:
         return self.get_base_data(blender_obj)
 
-    def specific_data_for_object(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
-        resource_type = blender_obj.get("iiif_type")
-        if resource_type == "Model":
-            return self.specific_data_for_model(blender_obj, resource_data , anno_collection)
-        elif resource_type in ("PerspectiveCamera", "OrthographicCamera"):
-            return self.specific_data_for_camera(blender_obj, resource_data , anno_collection)
-        else:
-            raise Exception("unsupported type for specific_data_for_object %r " % (resource_type,))
-            
-        
-    def specific_data_for_model(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict:
-        """
-        """
-        transforms = list()
-        saved_mode = blender_obj.rotation_mode
+    def applied_transforms_for_object(self, blender_obj:bpy.types.Object ) -> List[Transform]:
         try:
-            blender_obj.rotation_mode = "QUATERNION"
-            quat = blender_obj.rotation_quaternion
-            # the angle property can be used to decide if this is,
-            # essentially a 0-rotation, to within sensible precision
-            abs_angle = abs(quat.angle)
+            return {
+                "Model" :               self.applied_transforms_for_model,
+                "PerspectiveCamera" :   self.applied_transforms_for_camera,
+                "OrthographicCamera" :  self.applied_transforms_for_camera,
+            }[blender_obj.get("iiif_type","")](blender_obj)
+        except KeyError as badKey:
+            logger.error(f"unsupported type {repr(badKey)} in resource_data_for_object")
+            raise
             
-            if abs_angle > 1.0e-5:
-                iiif_rotation = Coordinates.blender_rotation_to_model_transform_angles(quat)
-                transforms.append(
-                    create_axes_named_values("RotateTransform", iiif_rotation)
-                )
-        finally:
-            blender_obj.rotation_mode = saved_mode
+     
+    def applied_transforms_for_model(self, model:Object) -> List[Transform] :
+        """
+        The applied transforms list is a list of geometric transforms that will be applied
+        to an imported model to achieve the current (to-be-exported) placing of the model
+        in the Blender coordinate system.
         
-        blender_scale = blender_obj.scale.to_tuple() # this is a (3,) tuple
-        is_uniform_scaling = True
-        uniform_scale = blender_scale[0]
-        # for now we warn on non-uniform scaling
-        for s in blender_scale[1:3]:
-            if s != uniform_scale:
-                logger.warning("non-uniform scaling %s for model" % (blender_scale,))
-                is_uniform_scaling = False
-                break
-        # non-uniform scaling is wta
-        # problematic if there are rotations involved,
-        # but this is as good as we can get to convert to iiif-Coordinates
-        iiif_scale = ( blender_scale[0], blender_scale[2], blender_scale[1] )
+        It allows for the possibility that the mesh coordinates of the imported model have
+        been modifed by rotations,scalings, translations defined within the imported model
+        file format. 
         
-        if not ( is_uniform_scaling and uniform_scale == 1 ):
-            transforms.append(
-                create_axes_named_values("ScaleTransform", iiif_scale)
-            )
-            
-         
-        if transforms:
-            retVal = {
-                "type" : "SpecificResource",
-                "source" : resource_data,
-                "transform" : transforms
-            }
+        If the orientation, scale, location of the imported model have not been modified
+        by the user then this set of transforms should reduce to the identity.
+        """
+        current_placement : Placement = get_object_placement( model )
+        
+        exported_transform_list: List[Transform] = []
+        try:
+            initial_transform = model[INITIAL_TRANSFORM]
+        except KeyError:
+            exported_transform_list.extend(
+            [
+                current_placement.scaling,
+                current_placement.rotation,
+                current_placement.translation
+            ])
         else:
-            retVal = resource_data
+            initial_placement = decode_blender_transform(initial_transform)
             
-        return retVal
+            # following calculation 
+            exported_transform_list.extend(
+            [
+                initial_placement.translation.inverse(),
+                initial_placement.rotation.inverse(),
+                initial_placement.scaling.inverse(),
+                current_placement.scaling,
+                current_placement.rotation,
+                current_placement.translation
+            ]
+            )        
+        return exported_transform_list
 
-    def specific_data_for_camera(self, blender_obj:bpy.types.Object, resource_data:dict, anno_collection:bpy.types.Collection ) -> dict :
+
+    def applied_transforms_for_camera(self, camera:Object) -> List[Transform] :
         """
         """
-        transforms = list()
-        saved_mode = blender_obj.rotation_mode
-        try:
-            blender_obj.rotation_mode = "QUATERNION"
-            quat = blender_obj.rotation_quaternion
-            # the angle property can be used to decide if this is,
-            # essentially a 0-rotation, to within sensible precision
-            abs_angle = abs(quat.angle)
-            
-            if abs_angle > 1.0e-5:
-                iiif_rotation = Coordinates.blender_rotation_to_camera_transform_angles(quat)
-                transforms.append(
-                    create_axes_named_values("RotateTransform", iiif_rotation)
-                )
-        finally:
-            blender_obj.rotation_mode = saved_mode
-            
-         
-        if transforms:
-            retVal = {
-                "type" : "SpecificResource",
-                "source" : resource_data,
-                "transform" : transforms
-            }
-        else:
-            retVal = resource_data
-            
-        logger.info("returning body for camera: %r" % retVal)
-        return retVal
+        current_placement : Placement = get_object_placement( camera )
+        initial_rotation = Rotation( Quaternion( Vector((1.0,0.0,0.0)), math.pi/2))
+        exported_transform_list: List[Transform] = []
+        exported_transform_list.extend(
+            [
+                initial_rotation.inverse(),
+                current_placement.scaling,
+                current_placement.rotation,
+                current_placement.translation
+            ]
+        ) 
+        return exported_transform_list  
         
         
         
-    def target_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
-        if blender_obj.get("iiif_type", None) in ("Model","PerspectiveCamera"):
-            return self.target_data_for_model(blender_obj, anno_collection )
-        else:
-            logger.warning("invalid object %r in target_data_for_object" % (blender_obj),)
-            return {}
-        
-    def target_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
-        """
-        Examines the Blender "location" of the blender_obj and returns a SpecificResource data
-        with a PointSelector and source of the enclosing scene
-        """  
-        ALWAYS_USE_POINTSELECTOR=False
-         
-        enclosing_scene=getTargetScene(anno_collection)
-        if enclosing_scene is not None:
-            scene_ref_data = {
-                "id" :   enclosing_scene.get("iiif_id"),
-                "type" : enclosing_scene.get("iiif_type")
-            }
-            
-            blender_location = blender_obj.location
-            iiif_position = Coordinates.blender_vector_to_iiif_position(blender_location)
-            
-            if iiif_position != (0.0,0.0,0.0) or ALWAYS_USE_POINTSELECTOR:
-                target_data = {
-                "type" : "SpecificResource",
-                "source" : scene_ref_data,
-                "selector" : create_axes_named_values("PointSelector", iiif_position)
-                }
-            else:
-                target_data = scene_ref_data
-            return target_data
-        else:
-            raise  Exception("enclosing scene not identified to for model target")
+##    def target_data_for_object(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+##        if blender_obj.get("iiif_type", None) in ("Model","PerspectiveCamera"):
+##            return self.target_data_for_model(blender_obj, anno_collection )
+##        else:
+##            logger.warning("invalid object %r in target_data_for_object" % (blender_obj),)
+##            return {}
+##        
+##    def target_data_for_model(self, blender_obj:bpy.types.Object, anno_collection:bpy.types.Collection) -> dict:
+##        """
+##        Examines the Blender "location" of the blender_obj and returns a SpecificResource data
+##        with a PointSelector and source of the enclosing scene
+##        """  
+##        ALWAYS_USE_POINTSELECTOR=False
+##         
+##        enclosing_scene=getTargetScene(anno_collection)
+##        if enclosing_scene is not None:
+##            scene_ref_data = {
+##                "id" :   enclosing_scene.get("iiif_id"),
+##                "type" : enclosing_scene.get("iiif_type")
+##            }
+##            
+##            blender_location = blender_obj.location
+##            iiif_position = Coordinates.blender_vector_to_iiif_position(blender_location)
+##            
+##            if iiif_position != (0.0,0.0,0.0) or ALWAYS_USE_POINTSELECTOR:
+##                target_data = {
+##                "type" : "SpecificResource",
+##                "source" : scene_ref_data,
+##                "selector" : create_axes_named_values("PointSelector", iiif_position)
+##                }
+##            else:
+##                target_data = scene_ref_data
+##            return target_data
+##        else:
+##            raise  Exception("enclosing scene not identified to for model target")
         
 
 

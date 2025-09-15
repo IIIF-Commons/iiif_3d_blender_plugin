@@ -305,8 +305,7 @@ import_transform_callables : Dict[str,Callable] = {
     ROTATE_TRANSFORM :    Rotation.from_iiif_dict,
     TRANSLATE_TRANSFORM : Translation.from_iiif_dict,
     POINT_SELECTOR      : Translation.from_iiif_dict,
-    SCALE_TRANSFORM :     Scaling.from_iiif_dict,
-    
+    SCALE_TRANSFORM :     Scaling.from_iiif_dict,    
 }      
 
 def get_object_placement( blender_obj : Object ) -> Placement:

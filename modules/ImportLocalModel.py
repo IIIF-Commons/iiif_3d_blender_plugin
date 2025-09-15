@@ -4,7 +4,8 @@ from typing import Set, Callable, Tuple
 from .editing.models import  (  IIIF_TEMP_FORMAT, 
                                 INITIAL_TRANSFORM ,
                                 mimetype_from_extension ,
-                                encode_blender_transform )
+                                encode_blender_placement )
+from .editing.transforms import Placement
 
 import bpy
 from bpy.props import StringProperty
@@ -109,10 +110,13 @@ class ImportLocalModel(Operator):
             new_model[IIIF_TEMP_FORMAT] = self.mimetype
             
             
-            blender_transform_encoding : str  = encode_blender_transform(
-                                                new_model.location, 
-                                                new_model.rotation_quaternion,
-                                                new_model.scale  )
+            blender_transform_encoding : str  = encode_blender_placement(
+                                                    Placement(
+                                                        new_model.location, 
+                                                        new_model.rotation_quaternion,
+                                                        new_model.scale  
+                                                    )
+                                                )
             logger.debug(f"initial transform: {blender_transform_encoding}")
             new_model[INITIAL_TRANSFORM] = blender_transform_encoding
             
