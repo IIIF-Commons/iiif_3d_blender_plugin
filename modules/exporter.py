@@ -16,7 +16,7 @@ from .editing.collections import (getScenes,
                     getBodyObject,
                     getManifests)
                     
-from editing.transforms import Transform, Placement, Rotation, get_object_placement
+from .editing.transforms import Transform, Placement, Rotation, get_object_placement
      
 #   INITIAL_TRANSFORM is string-valued constant
 #   shared with the models module, it is used as the
