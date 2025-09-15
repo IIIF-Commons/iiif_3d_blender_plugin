@@ -1,9 +1,13 @@
 import json
 from bpy.types import Object
-#from typing import  Tuple
-#from mathutils import Vector, Quaternion
+from typing import  List
 
-from .transforms import Placement
+# Developer Note 9/15/2025: the following types not appear explicitly
+# in the code but are required to decode the INITIAL_TRANSFORM string
+from mathutils import Vector, Quaternion
+from .transforms import Scaling, Translation, Rotation
+
+from .transforms import Placement, Transform, transformsToPlacements
 
 import logging
 logger = logging.getLogger("iiif.models")
@@ -62,10 +66,46 @@ def configure_model(    new_model : Object,
     new_model["iiif_type"] = "Model"
     new_model["iiif_json"] = json.dumps(resource_data)
 
-    new_model.location = placement.translation.data
+    # now combine any placement defined during the resource import
+    # with that that defined in the placment passed INITIAL_TRANSFORM
+    
+    transform_list : List[Transform] = list()
+    try:
+        initial_placement_encoded = new_model[INITIAL_TRANSFORM]
+        logger.debug("repr(initial_placement_encoded) %s" % initial_placement_encoded)
+    except KeyError:
+        pass
+    else:
+        initial_placement = decode_blender_transform(initial_placement_encoded)
+        transform_list.extend([
+            initial_placement.scaling,
+            initial_placement.rotation,
+            initial_placement.translation
+        ])
+    transform_list.extend([
+        placement.scaling,
+        placement.rotation,
+        placement.translation
+    ])
+    
+    logger.debug("traanform_list in configure_model %s" % repr(transform_list))
+    
+    # convert this list to a list of Placement instances, hopefully there's
+    # only one
+    
+    placements = list( transformsToPlacements(transform_list ))
+    
+    configured_placement : Placement = Placement()
+    if len(placements) > 0:
+        configured_placement = placements[0]
+    if len(placements) > 1:
+        logger.warning("combination of transforms on import cannot be reduced to 1 placement")
+        
+        
+    new_model.location = configured_placement.translation.data
     new_model.rotation_mode = "QUATERNION"
-    new_model.rotation_quaternion = placement.rotation.data
-    new_model.scale = placement.scaling.data
+    new_model.rotation_quaternion = configured_placement.rotation.data
+    new_model.scale = configured_placement.scaling.data
     
     return    
 
@@ -107,6 +147,6 @@ def decode_blender_transform( encoding : str ) -> Placement:
     """
     try:
         return eval( encoding )
-    except Exception:
-        logger.error(f"unable to decode transform: {repr(encoding)}")
+    except Exception as exc:
+        logger.error(f"unable to decode transform: {repr(encoding)}", exc)
         return Placement()

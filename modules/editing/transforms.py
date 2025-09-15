@@ -95,7 +95,7 @@ class Translation(Transform):
         return retVal
 
     def __repr__(self):
-        return "Translation(%r)" % repr(self.data)   
+        return "Translation(%r)" %  self.data  
                 
 class Rotation(Transform):
     def __init__(self, quat : Quaternion ):
@@ -154,7 +154,7 @@ class Rotation(Transform):
         return retVal
 
     def __repr__(self):
-        return "Rotation(%r)" % repr(self.data)    
+        return "Rotation(%r)" %  self.data  
     
 class Scaling(Transform):
     def __init__(self, vec: Vector ):
@@ -266,7 +266,7 @@ class Scaling(Transform):
         return retVal
         
     def __repr__(self):
-        return "Scaling(%r)" % repr(self.data)
+        return "Scaling(%r)" %  self.data
         
 
 class Placement:

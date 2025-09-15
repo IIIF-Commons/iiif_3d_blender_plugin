@@ -249,6 +249,15 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
         Will always return a not None value, if no Transforms are in the body_data
         or target_data, the return value will be the identity Placement
+        
+        The placement (combination of scale, rotation, and translation ) returned by
+        this function only includes the action defined in the transform property of
+        a SpecificResource instance in the body property or a PointSelector in the 
+        target property. The placement returned by this function does not include any
+        scale,rotation,translation defined during import of a model resource, or of
+        the rotation required to transform a default Blender camera to a default IIIF
+        camera. It will be the role of the configure_camera / configure_model functions
+        to combine the geometric effects of all placements on a resource.
         """
         
         def iiif_transforms() -> Iterable[dict]:

@@ -5,7 +5,7 @@ from .editing.models import  (  IIIF_TEMP_FORMAT,
                                 INITIAL_TRANSFORM ,
                                 mimetype_from_extension ,
                                 encode_blender_placement )
-from .editing.transforms import Placement
+from .editing.transforms import Placement, get_object_placement
 
 import bpy
 from bpy.props import StringProperty
@@ -111,11 +111,7 @@ class ImportLocalModel(Operator):
             
             
             blender_transform_encoding : str  = encode_blender_placement(
-                                                    Placement(
-                                                        new_model.location, 
-                                                        new_model.rotation_quaternion,
-                                                        new_model.scale  
-                                                    )
+                                                    get_object_placement(new_model)
                                                 )
             logger.debug(f"initial transform: {blender_transform_encoding}")
             new_model[INITIAL_TRANSFORM] = blender_transform_encoding
