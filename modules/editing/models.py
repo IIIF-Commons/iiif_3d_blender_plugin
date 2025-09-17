@@ -4,10 +4,10 @@ from typing import  List
 
 # Developer Note 9/15/2025: the following types not appear explicitly
 # in the code but are required to decode the INITIAL_TRANSFORM string
-from mathutils import Vector, Quaternion
-from .transforms import Scaling, Translation, Rotation
+from mathutils import Vector, Quaternion # noqa: F401
+from .transforms import Placement, Scaling, Translation, Rotation # noqa: F401
 
-from .transforms import Placement, Transform, transformsToPlacements
+from .transforms import  Transform, transformsToPlacements
 
 import logging
 logger = logging.getLogger("iiif.models")

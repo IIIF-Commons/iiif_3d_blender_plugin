@@ -298,7 +298,20 @@ def transformsToPlacements( transforms:Iterable[Transform]) -> Generator[Placeme
                 transform.applyToPlacement(accum)
     if not accum.isIdentity():
         yield accum
-            
+
+def simplifyTransforms( transforms : Iterable[Transform] )  -> List[Transform]:
+    """
+    simplifies the list of transforms by combinging into Placements then
+    outputting as list, removing exact identities
+    
+    Can potentially return an empty list
+    """
+    retVal : List[Transform]  = list()
+    for placement in  transformsToPlacements( transforms ):
+        for t in placement.to_transform_list():
+            if not t.isIdentity():
+                retVal.append(t)
+    return retVal
 
 
 import_transform_callables : Dict[str,Callable] = {

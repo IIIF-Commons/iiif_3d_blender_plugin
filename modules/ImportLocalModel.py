@@ -5,7 +5,7 @@ from .editing.models import  (  IIIF_TEMP_FORMAT,
                                 INITIAL_TRANSFORM ,
                                 mimetype_from_extension ,
                                 encode_blender_placement )
-from .editing.transforms import Placement, get_object_placement
+from .editing.transforms import  get_object_placement
 
 import bpy
 from bpy.props import StringProperty

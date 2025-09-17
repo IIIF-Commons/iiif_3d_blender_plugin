@@ -16,7 +16,12 @@ from .editing.collections import (getScenes,
                     getBodyObject,
                     getManifests)
                     
-from .editing.transforms import Transform, Placement, Rotation, get_object_placement
+from .editing.transforms import (   Transform, 
+                                    Placement, 
+                                    Rotation,
+                                    Translation, 
+                                    get_object_placement, 
+                                    simplifyTransforms )
      
 #   INITIAL_TRANSFORM is string-valued constant
 #   shared with the models module, it is used as the
@@ -122,7 +127,9 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         
         if bodyObj is not None:
             resource_data = self.resource_data_for_object( bodyObj )
-            transforms    = self.applied_transforms_for_object( bodyObj )
+            transforms    = simplifyTransforms(
+                                self.applied_transforms_for_object( bodyObj )
+                            )
             anno_data["target"] = self.target_data_for_object(  resource_data, 
                                                                 transforms, 
                                                                 anno_collection)
@@ -143,15 +150,46 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
         # Translation, will be encoded in the target. The remaining transforms will
         # be simplified to list of placements, and then converted back to a list of
         # transforms and then iiif Tranform resources
-        return {}
+        if len(transforms) > 0 and isinstance( transforms[-1], Translation):
+            transforms = transforms[:-1]
+
+        if (len(transforms) > 0):
+            specific_resource = {
+                "type" : "SpecificResource",
+                "transform" : [
+                    t.to_iiif_dict() for t in transforms
+                ],
+                "source" : resource_data
+            }
+            return specific_resource
+        else:
+            return resource_data
+
         
     def target_data_for_object(self,    resource_data:dict, 
                                         transforms: List[Transform], 
                                         anno_collection:bpy.types.Collection) -> dict:
         target = getTargetScene( anno_collection )
-        return {
-            "id": target["iiif_id"]
+        scene_resource = {
+            "id": target["iiif_id"],
+            "type" : "Scene"
         }
+        
+        if len(transforms) > 0 and isinstance( transforms[-1], Translation):
+            def build_selector(tt:Translation) -> dict:
+                tmp = tt.to_iiif_dict()
+                tmp["type"]="PointSelector"
+                return tmp
+                
+            selector = build_selector( transforms[-1] )
+            
+            return {
+                "type": "SpecificResource",
+                "selector" : selector,
+                "source"   : scene_resource
+            }
+        else:
+            return scene_resource
 
 
     def resource_data_for_object(self, blender_obj:bpy.types.Object) -> dict:
