@@ -1,6 +1,6 @@
 import json
 from bpy.types import Object
-from typing import  List
+from typing import  List, Iterable, Tuple
 
 # Developer Note 9/15/2025: the following types not appear explicitly
 # in the code but are required to decode the INITIAL_TRANSFORM string
@@ -150,3 +150,18 @@ def decode_blender_transform( encoding : str ) -> Placement:
     except Exception as exc:
         logger.error(f"unable to decode transform: {repr(encoding)}", exc)
         return Placement()
+        
+def walk_object_tree(parent_object : Object , depth:int = 0)  -> Iterable[Tuple[int,Object]]:
+    """
+    traverses the parent-child tree, depth first order
+    for the Blender objects
+    
+    depth will increment by +1 as we go down the tree
+    the returned depth can/should be monitores to stop
+    infinite loops because of a cycle in the tree
+    """
+    yield (depth, parent_object)
+    for child_object in parent_object.children:
+        for tup in walk_object_tree(child_object, depth+1):
+            yield tup
+

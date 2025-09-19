@@ -19,6 +19,7 @@ from .editing.collections import (  new_manifest,
                                     SCENE_TYPE)
                                     
 from .editing.transforms import Transform, Placement, transformsToPlacements
+from .editing.models import walk_object_tree
 
 from .utils.color import hex_to_rgba
 from .utils.json_patterns import (
@@ -155,12 +156,15 @@ class ImportIIIF3DManifest(Operator, ImportHelper):
         
         anno_collection["iiif_json"] = json.dumps(annotation_data)
         
-        # Developer note 13 Jun 2025
-        # the body_to_object function returns a Blender object which ia the model
-        # camera, or light; but at this revision  this object
-        # is not needed at this stage of the import
+        
         new_object: Object = self.body_to_object(body_data, target_data )
-        move_object_into_collection(new_object, anno_collection)
+        
+        LOOP_GUARD_MAX=8
+        for depth, _obj in walk_object_tree(new_object):
+            if depth > LOOP_GUARD_MAX:
+                raise Exception("infinite (or too deep) object parent-child tree")
+            move_object_into_collection(_obj, anno_collection)
+            
         return
                     
     def body_to_object(self, body_data : dict, target_data: dict) -> Object:

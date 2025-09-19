@@ -57,7 +57,7 @@ class ExportIIIF3DManifest(Operator, ExportHelper):
 
     def get_base_data(self, iiif_object) -> dict:
         """
-        iiif_object is withe a Blender collection or Blender object
+        iiif_object is either a Blender collection or Blender object
         for which custom properties iiif_id, iiif_type, and iiif_json
         have been defined. Returns a python dict which contains information
         for the json output in Manifest.

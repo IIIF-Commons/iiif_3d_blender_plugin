@@ -89,6 +89,8 @@ def move_object_into_collection(blender_object : Object, parent: Collection ) ->
     for coll in blender_object.users_collection:
         coll.objects.unlink(blender_object)
     parent.objects.link(blender_object)
+
+    
     
 _collection_template_dict  = {
     MANIFEST_TYPE : {
