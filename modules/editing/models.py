@@ -109,7 +109,17 @@ def configure_model(    new_model : Object,
     
     return    
 
-
+def replace_model_id(model : Object, new_id:str) -> None:
+    """
+    replace the existing value of the id, in both places
+    in which the Blender object stores it.
+    """
+    model["iiif_id"] = new_id
+    model_data = json.loads( model.get("iiif_json","{}"))
+    model_data["id"] = new_id
+    model["iiif_json"] = json.dumps(model_data)
+    return
+    
 _ext_to_mime_dict = {
     "GLB" : "model/gltf-binary",
     "GLTF": "model/gltf+json"

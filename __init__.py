@@ -10,6 +10,7 @@ from .modules.ImportNetworkModel import ImportNetworkModel
 from .modules.NewManifest import NewManifest
 from .modules.NewCamera import NewCamera
 from .modules.LoadLocalModel import LoadLocalModel
+from .modules.LoadNetworkModel import LoadNetworkModel
 
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
@@ -54,6 +55,7 @@ classes = (
     ImportLocalModel,
     ImportNetworkModel,
     LoadLocalModel,
+    LoadNetworkModel,
     IIIFManifestPanel,
     AddIIIF3DObjProperties,
     AddIIIF3DCollProperties,

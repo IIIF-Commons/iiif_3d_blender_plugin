@@ -3,7 +3,7 @@ from typing import Set
 
 from .editing.models import  mimetype_from_extension , configure_model, walk_object_tree
 from .editing.transforms import Placement
-from .editing.collections import move_object_into_collection
+from .editing.collections import move_object_into_collection, new_annotation
 
 import bpy
 from bpy.props import StringProperty
@@ -85,11 +85,15 @@ class ImportLocalModel(Operator,  ImportHelper):
         placement = Placement() # use the identity placement for the new import_scene
         configure_model(new_model, model_data,placement)
         
+        annotation_collection=new_annotation()
+        context.collection.children.link(annotation_collection) 
+
+        
         LOOP_GUARD_MAX=8
         for depth, _obj in walk_object_tree(new_model):
             if depth > LOOP_GUARD_MAX:
                 raise Exception("infinite (or too deep) object parent-child tree")
-            move_object_into_collection(_obj, context.collection)
+            move_object_into_collection(_obj, annotation_collection)
                     
         
         

@@ -1,10 +1,11 @@
-import os  
-import tempfile 
-import urllib.parse
-import urllib.request
-import shutil
 
-from typing import Set, Callable
+from typing import Set
+
+from .editing.models import configure_model, walk_object_tree
+from .editing.collections import move_object_into_collection, new_annotation
+from .editing.transforms import Placement
+
+
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Context, Operator
@@ -51,61 +52,54 @@ class ImportNetworkModel(Operator):
         subtype="NONE",
     )
     
-    
+    def invoke(self, context, event):
+        logger.info("ImportRemoteModel.invoke entered")
+        self.model_url=""
+        rv = context.window_manager.invoke_props_dialog(self, width=640)
+        logger.info("return from invoke_props_dialog %r : %r" % (rv, self.model_url) )
+        return rv
+
 
     def execute(self, context: Context) -> Set[str]:
-        
-        scheme = urllib.parse.urlparse(self.model_url).scheme        
-        if scheme not in {"http", "https"}:
-            message = "unsupport url scheme %s for network retrieve" % (scheme,)
-            logger.warn(message)
-            return {"CANCELLED"}
 
-        with tempfile.TemporaryDirectory(dir=bpy.app.tempdir) as tempdirname:
-            model_basename = os.path.basename( self.model_url)
-            local_filepath = os.path.join(tempdirname,model_basename)
-           
-            with urllib.request.urlopen( self.model_url ) as http_open_context:
-                if http_open_context.status not in {200}:
-                    message = "HTTP status returned as %s : retrieval cancelled" \
-                                 % http_open_context.status
-                    logger.warn(message)
-                    return {"CANCELLED"}
-                 
-                try:
-                    http_mimetype = http_open_context.headers["Content-Type"]
-                    logger.debug(f"http header shows Content-Type {http_mimetype}")
-                except KeyError:
-                    http_mimetype = ""
-                    
-                    
-                with open(local_filepath, 'wb') as out_file:
-                    shutil.copyfileobj(http_open_context, out_file)
-                # closing out of urlopen Context Manager, with 
-                # URL data downloaded to local_filepath and 
-                # http_mimetype set to the Content-Type (or to "")
-    
-                    
-            mimetype = self.mimetype or http_mimetype
             
-            # call the ImportLocalModel Operator to import the contents
-            # of the local_filepath file into Blender as a Blender Object
-            _op : Callable[...,Set[str]] = \
-            bpy.ops.iiif.import_local_model # pyright:ignore[reportAttributeAccessIssue]
-            res = _op(filepath=local_filepath, mimetype=mimetype)
-            
-            # Closing out of the TemporaryDirectory context manager. The directory
-            # and the local_filepath will be deleted.
-            # the res value is FINISHED or CANCELLED from the import of the local_filepath
-            # and active_object should be set to the new Blender object. As well, the
-            # IIIF_TEMP_FORMAT custom property will identify the mime-type that guided the
-            # Blender import of the file.
+        # the key string is a mimetype
+        # the value is callable object compatible with
+        # the Operator.execute method; it will accept a filepath argument
+        # and return set of result values
         
-        if "CANCELLED" in res:
-            return res
+        local_loader = bpy.ops.iiif.load_network_model # pyright: ignore[reportAttributeAccessIssue]
+        load_result = local_loader(model_url = self.model_url)
+        if 'FINISHED' not in load_result:
+            return load_result
             
-        # including this just as a sanity-check
-        if context.active_object is None:
-            message = "context.active object is None after iiif.import_local_model"
-            logger.warn(message)
+        new_model = context.active_object
+        if new_model is None:
+            logger.warn("context.active_object is None")
+            return {"CANCELLED"}
+            
+        model_data = {
+            "id" : self.model_url,
+            "format" : self.mimetype,
+            "type"   : "Model"
+        }
+        placement = Placement() # use the identity placement for the new import_scene
+        configure_model(new_model, model_data,placement)
+        
+        annotation_collection=new_annotation()
+        context.collection.children.link(annotation_collection) 
+
+        
+        LOOP_GUARD_MAX=8
+        for depth, _obj in walk_object_tree(new_model):
+            if depth > LOOP_GUARD_MAX:
+                raise Exception("infinite (or too deep) object parent-child tree")
+            move_object_into_collection(_obj, annotation_collection)
+        
+        
+                    
+        
+        
+        # properties 
         return {"FINISHED"}
+       

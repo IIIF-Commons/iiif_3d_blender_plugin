@@ -86,6 +86,7 @@ def move_object_into_collection(blender_object : Object, parent: Collection ) ->
     This function will enforce that Object will only be in one collection, the parent
     collection
     """
+    logger.debug("moving object %s into collection %s" % (blender_object, parent))
     for coll in blender_object.users_collection:
         coll.objects.unlink(blender_object)
     parent.objects.link(blender_object)
