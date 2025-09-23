@@ -3,8 +3,8 @@ from bpy.utils import register_class, unregister_class
 
 from .modules.test import RunUnitTests
 
-from .modules.exporter import ExportIIIF3DManifest
-from .modules.importer import ImportIIIF3DManifest
+from .modules.exporter import ExportManifest
+from .modules.importer import ImportManifest
 from .modules.ImportLocalModel import ImportLocalModel
 from .modules.ImportNetworkModel import ImportNetworkModel
 from .modules.NewManifest import NewManifest
@@ -49,8 +49,8 @@ def menu_func_manifest_submenu(self,context):
 
 classes = (
     RunUnitTests,
-    ImportIIIF3DManifest,
-    ExportIIIF3DManifest,
+    ImportManifest,
+    ExportManifest,
     ImportLocalModel,
     ImportNetworkModel,
     LoadLocalModel,
@@ -66,12 +66,12 @@ classes = (
 
 def menu_func_import(self, context):
     self.layout.operator(
-        ImportIIIF3DManifest.bl_idname, text="IIIF 3D Manifest (.json)"
+        ImportManifest.bl_idname, text="IIIF 3D Manifest (.json)"
     )
 
 def menu_func_export(self, context):
     self.layout.operator(
-        ExportIIIF3DManifest.bl_idname, text="IIIF 3D Manifest (.json)"
+        ExportManifest.bl_idname, text="IIIF 3D Manifest (.json)"
     )
     
     

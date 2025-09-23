@@ -36,7 +36,7 @@ import math
 import logging
 logger = logging.getLogger("iiif.export")
 
-class ExportIIIF3DManifest(Operator, ExportHelper):
+class ExportManifest(Operator, ExportHelper):
     """Export IIIF 3D Manifest"""
 
     bl_idname = "export_scene.iiif_manifest"

@@ -41,7 +41,7 @@ logger = logging.getLogger("Import")
 class ImportManifestError(Exception):
     pass
     
-class ImportIIIF3DManifest(Operator, ImportHelper):
+class ImportManifest(Operator, ImportHelper):
     """Import IIIF 3D Manifest"""
 
     bl_idname = "import_scene.iiif_manifest"
