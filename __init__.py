@@ -3,8 +3,8 @@ from bpy.utils import register_class, unregister_class
 
 from .modules.test import RunUnitTests
 
-from .modules.exporter import ExportManifest
-from .modules.importer import ImportManifest
+from .modules.ExportManifest import ExportManifest
+from .modules.ImportManifest import ImportManifest
 from .modules.ImportLocalModel import ImportLocalModel
 from .modules.ImportNetworkModel import ImportNetworkModel
 from .modules.NewManifest import NewManifest
