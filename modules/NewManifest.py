@@ -1,3 +1,4 @@
+import json
 
 import bpy
 from bpy.types import Operator
@@ -21,6 +22,13 @@ class NewManifest(Operator):
         #configure_blender_scene()
         
         manifest=new_manifest()
+        # for new manifests add a default label, some viewers
+        # require one
+        manifest_data : dict = json.loads( manifest["iiif_json"])
+        label : dict = manifest_data["label"]
+        label["en"] = ["Blender generated IIIF manifest"]
+        manifest["iiif_json"] = json.dumps( manifest_data )
+        
         bpy.context.scene.collection.children.link(manifest)
         
         iiif_scene = new_scene()

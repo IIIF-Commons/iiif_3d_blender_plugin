@@ -49,6 +49,7 @@ def _new_collection( data:dict) -> Collection:
     retVal  = bpy.data.collections.new(blender_name)
     retVal["iiif_id"] =    data["id"]
     retVal["iiif_type"] =  data["type"]
+    retVal["iiif_json"] = json.dumps(data)
     
     # developer note: the iiif_json property will be set after the
     # child resources from the "items" list have been removed (and used
@@ -58,7 +59,8 @@ def _new_collection( data:dict) -> Collection:
 
 def new_manifest( data:Optional[dict] = None ) -> Collection:
     
-    valid_data : dict = data or _initial_data(MANIFEST_TYPE)    
+    valid_data : dict = data or _initial_data(MANIFEST_TYPE)  
+    logger.debug("manifest_data: %r" % repr(valid_data)) 
     return _new_collection(valid_data)
         
 def new_scene( data:Optional[dict] = None ) -> Collection:
@@ -134,8 +136,8 @@ _collection_template_dict  = {
     }
 }
     
-def _initial_data(str : str ) -> dict:
-    original = _collection_template_dict[str]
+def _initial_data(coll_type : str ) -> dict:
+    original = _collection_template_dict[coll_type]
     # the following:
     # makes  deep copy of the original  dict
     # verifies that the result is compatible with json
