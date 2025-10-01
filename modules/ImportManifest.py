@@ -20,6 +20,7 @@ from .editing.collections import (  new_manifest,
                                     
 from .editing.transforms import Transform, Placement, transformsToPlacements
 from .editing.models import walk_object_tree
+from .editing.fileops import uri_scheme, uri_to_path
 
 from .utils.color import hex_to_rgba
 from .utils.json_patterns import (
@@ -210,12 +211,26 @@ class ImportManifest(Operator, ImportHelper):
         except KeyError:
             raise ImportManifestError("no url for model provided")
         mimetype = resource_data.get("format","")
-        _op : Callable[..., Set[str]] = bpy.ops.iiif.import_network_model # pyright:ignore[reportAttributeAccessIssue]
-        import_result = _op(model_url=model_url, mimetype = mimetype ) 
-        logger.debug("bpy.ops.iiif.import_model result: %r" % import_result)
-        if "FINISHED" not in import_result:
-            raise ImportManifestError("import Operation failed with %r" % import_result)
+        
+        scheme = uri_scheme(model_url)
+        if scheme in {"http" , "https"}:
+            _op_network : Callable[..., Set[str]] = bpy.ops.iiif.load_network_model # pyright:ignore[reportAttributeAccessIssue]
+            import_result = _op_network(model_url=model_url, mimetype = mimetype ) 
+            logger.debug("bpy.ops.iiif.load_network_model result: %r" % import_result)
+            if "FINISHED" not in import_result:
+                raise ImportManifestError("import Operation failed with %r" % import_result)
 
+        elif scheme in {"file"}:
+            _op_local : Callable[..., Set[str]] = bpy.ops.iiif.load_local_model # pyright:ignore[reportAttributeAccessIssue]
+            model_filepath = uri_to_path(model_url)
+            import_result = _op_local(filepath=model_filepath, mimetype = mimetype ) 
+            logger.debug("bpy.ops.iiif.load_network_model result: %r" % import_result)
+            if "FINISHED" not in import_result:
+                raise ImportManifestError("import Operation failed with %r" % import_result)
+        
+        else:
+            raise ImportManifestError("unsupported scheme %s for model url %s" % (scheme, model_url))
+                        
         new_model = bpy.context.active_object
         if new_model is None:
             raise ImportManifestError("bpy.context.active_object not set")

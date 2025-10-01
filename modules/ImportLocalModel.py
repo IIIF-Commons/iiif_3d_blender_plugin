@@ -4,14 +4,13 @@ from typing import Set
 from .editing.models import  mimetype_from_extension , configure_model, walk_object_tree
 from .editing.transforms import Placement
 from .editing.collections import move_object_into_collection, new_annotation
+from .editing.fileops import path_to_uri
 
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Context, Operator
 from bpy_extras.io_utils import ImportHelper
 
-import pathlib # standard package supporting creating
-               # file-schema url from filesystem path
 import logging
 logger = logging.getLogger("iiif.import_local_model")
 
@@ -78,7 +77,7 @@ class ImportLocalModel(Operator,  ImportHelper):
         # be the responsibility of that client to replace the id
         # with an id from the network URL
         model_data = {
-            "id" : pathlib.Path(self.filepath).as_uri(),
+            "id" : path_to_uri(self.filepath),
             "format" : self.mimetype,
             "type"   : "Model"
         }

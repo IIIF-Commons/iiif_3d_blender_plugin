@@ -55,12 +55,11 @@ class LoadNetworkModel(Operator):
 
     def execute(self, context: Context) -> Set[str]:
         
-        scheme = urllib.parse.urlparse(self.model_url).scheme        
-        if scheme not in {"http", "https"}:
-            message = "unsupport url scheme %s for network retrieve" % (scheme,)
-            logger.warn(message)
+        if not bpy.app.online_access:
+            self.report({"ERROR"}, "Network access disabled in Blender settings")
+            logger.error("LoadNetworkModel.execute cancelled for bpy.app.online_access not true")
             return {"CANCELLED"}
-
+            
         with tempfile.TemporaryDirectory(dir=bpy.app.tempdir) as tempdirname:
             model_basename = os.path.basename( self.model_url)
             local_filepath = os.path.join(tempdirname,model_basename)
