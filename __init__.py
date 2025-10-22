@@ -11,6 +11,7 @@ from .modules.NewManifest import NewManifest
 from .modules.NewCamera import NewCamera
 from .modules.LoadLocalModel import LoadLocalModel
 from .modules.LoadNetworkModel import LoadNetworkModel
+from .modules.SceneBackground import SceneBackground
 
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
@@ -28,13 +29,13 @@ import logging
 logger=logging.getLogger("iiif.init")
 
 
-class OUTLINER_MT_edit_manifest(Menu):
+class OUTLINER_MT_edit_manifest_anno_page(Menu):
     """
     intent is that this menu will be added to the popup
     menu associated with any Blender bpy.type.Collection
     which has an iiif_type property value of AnnotationPage
     """
-    bl_label="Manifest Editing"
+    bl_label="Add Painting Annotations"
     bl_idname="OUTLINER_MT_edit_manifest"
     
     def draw(self,context):
@@ -42,11 +43,27 @@ class OUTLINER_MT_edit_manifest(Menu):
         layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
         layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
         layout.operator(NewCamera.bl_idname, text="Add Camera")
+        
+##class OUTLINER_MT_edit_manifest_scene(Menu):
+##    """
+##    intent is that this menu will be added to the popup
+##    menu associated with any Blender bpy.type.Collection
+##    which has an iiif_type property value of Scene
+##    """
+##    bl_label="Edit Background Color"
+##    bl_idname="OUTLINER_MT_edit_manifest_scene"
+##    
+##    def draw(self,context):
+##        layout = self.layout
+##        layout.operator(NewCamera.bl_idname, text="Add Camera")
 
 def menu_func_manifest_submenu(self,context):
     target_collection = context.collection
+    layout = self.layout
     if target_collection.get("iiif_type","") == "AnnotationPage":
-        self.layout.menu(OUTLINER_MT_edit_manifest.bl_idname, text="Edit Manifest") 
+        layout.menu(OUTLINER_MT_edit_manifest_anno_page.bl_idname, text="Add Painting Annotation") 
+    elif target_collection.get("iiif_type","") == "Scene":
+        layout.operator(SceneBackground.bl_idname, text="Set Background Color")
 
 classes = (
     RunUnitTests,
@@ -56,6 +73,7 @@ classes = (
     ImportNetworkModel,
     LoadLocalModel,
     LoadNetworkModel,
+    SceneBackground,
     IIIFManifestPanel,
     AddIIIF3DObjProperties,
     AddIIIF3DCollProperties,
@@ -63,7 +81,7 @@ classes = (
     IIIF3DCollMetadataPanel,
     NewManifest,
     NewCamera,
-    OUTLINER_MT_edit_manifest
+    OUTLINER_MT_edit_manifest_anno_page
 )
 
 def menu_func_import(self, context):
