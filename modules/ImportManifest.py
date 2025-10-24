@@ -29,8 +29,6 @@ from .utils.json_patterns import (
 )
 
 
-from .utils.blender_setup import set_scene_background_color
-
 import logging
 
 logger = logging.getLogger("Import")
@@ -77,6 +75,10 @@ class ImportManifest(Operator, ImportHelper):
     def process_manifest(self, manifest_data: dict) -> None:
         """Process the manifest data and import the model"""
 
+        logger.debug("call Configure3DViewport")
+        res = bpy.ops.iiif.configure_viewport() # pyright: ignore[reportAttributeAccessIssue]
+        logger.debug("result Configure3DViewport: %s" % res)
+
         # Store manifest metadata on the main scene collection
         main_collection = new_manifest( manifest_data )
         move_collection_into_parent( main_collection, self.context.scene.collection)
@@ -97,9 +99,12 @@ class ImportManifest(Operator, ImportHelper):
         bgColorHex = scene_data.get("backgroundColor", None)
         if bgColorHex:            
             bgColor=hex_to_rgba(bgColorHex)
-            logger.info("setting background color to %r, %s" % (bgColor, bgColorHex))
-            set_scene_background_color(bgColor)
+            
+            scene_collection.background.color = bgColor
+            scene_collection.background.export = True
+        
             del scene_data["backgroundColor"]
+        
         
         if "items" in scene_data:
             for item in scene_data.get("items", [])[:]:

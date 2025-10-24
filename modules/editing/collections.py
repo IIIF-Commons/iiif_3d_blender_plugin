@@ -4,7 +4,7 @@ from bpy.types import Collection, Object
 from  typing import Optional
 
 from . import generate_id, generate_name_from_data
-
+from ..utils.blender_setup import get_scene_background_color
 import logging
 logger = logging.getLogger("iiif.collections")
 logger.setLevel(logging.INFO)
@@ -19,14 +19,10 @@ logger.setLevel(logging.INFO)
 # Manifest, Scene, AnnotationPage, and Annotation
 
 
-
-
 MANIFEST_TYPE="Manifest"
 SCENE_TYPE=   "Scene"
 ANNOTATIONPAGE_TYPE= "AnnotationPage"
 ANNOTATION_TYPE = "Annotation"
-
-
 
 def _new_collection( data:dict) -> Collection:
     """
@@ -56,7 +52,6 @@ def _new_collection( data:dict) -> Collection:
     # to initialize child collections)
     return retVal
     
-
 def new_manifest( data:Optional[dict] = None ) -> Collection:
     
     valid_data : dict = data or _initial_data(MANIFEST_TYPE)  
@@ -66,7 +61,13 @@ def new_manifest( data:Optional[dict] = None ) -> Collection:
 def new_scene( data:Optional[dict] = None ) -> Collection:
     
     valid_data : dict = data or _initial_data(SCENE_TYPE)   
-    return _new_collection(valid_data)
+    collection : Collection =  _new_collection(valid_data)
+    
+    # set the custom property background.color defined in the Collection
+    # instance to the current value of the Blender World Background color
+    collection.background.color = get_scene_background_color()
+    collection.background.export = False
+    return collection
 
 def new_annotation_page( data:Optional[dict] = None ) -> Collection:
     

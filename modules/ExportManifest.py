@@ -29,8 +29,6 @@ from .editing.transforms import (   Transform,
 #   that the model had on import from glTF         
 from .editing.models import INITIAL_TRANSFORM, decode_blender_transform
 
-from .utils.blender_setup import get_scene_background_color
-
 import math
 
 import logging
@@ -90,9 +88,10 @@ class ExportManifest(Operator, ExportHelper):
     def get_scene_data(self, scene_collection: bpy.types.Collection) -> dict:
         scene_data = self.get_base_data(scene_collection)
         
-        backgroundColor = get_scene_background_color()
         
-        if backgroundColor is not None:
+        
+        if scene_collection.background.export:
+            backgroundColor = scene_collection.background.color
             color_hex = rgba_to_hex( backgroundColor )
             logger.info("setting scene backgroundColor to %s" % color_hex)
             scene_data["backgroundColor"] = color_hex

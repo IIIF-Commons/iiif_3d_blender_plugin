@@ -27,6 +27,9 @@ class NewManifest(Operator):
         label["en"] = ["Blender generated IIIF manifest"]
         manifest["iiif_json"] = json.dumps( manifest_data )
         
+        logger.info("call Configure3DViewport")
+        res = bpy.ops.iiif.configure_viewport() # pyright: ignore[reportAttributeAccessIssue]
+        logger.info("result Configure3DViewport: %s" % res)
         bpy.context.scene.collection.children.link(manifest)
         
         iiif_scene = new_scene()
