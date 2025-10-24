@@ -18,8 +18,6 @@ class NewManifest(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        logger.info("called build")
-        #configure_blender_scene()
         
         manifest=new_manifest()
         # for new manifests add a default label, some viewers
