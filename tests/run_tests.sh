@@ -22,7 +22,7 @@ run_test() {
 
 for manifest in tests/iiif_manifests/*.json; do
     echo "ℹ️  Testing import of manifest: $manifest"
-    if ! run_test "blender --background --python tests/setup_logging.py --python run_blender_with_plugin.py -- '$manifest'"; then
+    if ! run_test "blender --background --online-mode --python tests/setup_logging.py --python run_blender_with_plugin.py -- '$manifest'"; then
         ((FAILED_TESTS++))
     fi
 done
