@@ -26,20 +26,20 @@ class Configure3DViewport(Operator):
             # for simplicity  specify that the Blender scene world data
             # specifies its color through a simple color, rather than a
             # appearance defined by Blender shader nodes
-            context.scene.world.use_nodes = False
+            context.scene.world.use_nodes = False # type: ignore
 
             for space_data in findSpaceView3D(context):
                 # space_data is type SpaceView3D
                 # https://docs.blender.org/api/current/bpy.types.SpaceView3D.html
                 logger.info("located space_data: %s" % space_data)
                 
-                shading : View3DShading = space_data.shading
+                shading : View3DShading = space_data.shading # type: ignore
                 
                 # this configures the viewport to use the Blender scene world data
                 # to determine it's background_type
-                shading.background_type="WORLD"
+                shading.background_type="WORLD" # type: ignore
                 
-                shading.color_type="TEXTURE"
+                shading.color_type="TEXTURE"    # type: ignore
                 
         except Exception as exc:
             logger.exception("exception thrown", exc)

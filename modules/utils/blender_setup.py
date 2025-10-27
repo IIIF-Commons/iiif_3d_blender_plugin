@@ -32,7 +32,7 @@ def configure_blender_scene():
         scene.render.resolution_y = resolutionY
     return 
     
-def configure_camera(cameraObj):
+def setup_camera(cameraObj):
     """
     argument is the bpy.types.object for a camera
     """
@@ -40,13 +40,13 @@ def configure_camera(cameraObj):
     # set the "units" for the camera field to be "FOV", this 
     # gives a more useful UI for adjusting the focal length of the
     # camera
-    cameraObj.data.lens_unit='FOV'
-
+    cameraObj.data.lens_unit='FOV' 
     # This will cause the value displayed in UI in Field Of View to
     # be the vertical angle in degrees,
-    cameraObj.data.sensor_fit = 'VERTICAL'
+    cameraObj.data.sensor_fit = 'VERTICAL' 
     return
     
+
     
 
     
@@ -60,8 +60,8 @@ def set_scene_background_color(blenderColor):
     generally will have rgba[3] = 1.0; no transparency
     """
     
-    bpy.context.scene.world.use_nodes = False        # pyright: ignore [reportOptionalMemberAccess]
-    bpy.context.scene.world.color = blenderColor[:3] # pyright: ignore [reportOptionalMemberAccess]
+    bpy.context.scene.world.use_nodes = False        # type: ignore
+    bpy.context.scene.world.color = blenderColor[:3] # type: ignore
     return None
     
 def get_scene_background_color() -> tuple[float,float,float,float] | None :
@@ -73,7 +73,7 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
     denoting red-green-blue-alpha color channel values
     generally will have rgba[3] = 1.0; no transparency
     """
-    raw_color = bpy.context.scene.world.color # pyright: ignore [reportOptionalMemberAccess]
+    raw_color = bpy.context.scene.world.color # type: ignore
         
     try:
         raw_color_list = [float(x) for x in raw_color]

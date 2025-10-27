@@ -65,8 +65,8 @@ def new_scene( data:Optional[dict] = None ) -> Collection:
     
     # set the custom property background.color defined in the Collection
     # instance to the current value of the Blender World Background color
-    collection.background.color = get_scene_background_color()
-    collection.background.export = False
+    collection.background.color = get_scene_background_color()  # type: ignore
+    collection.background.export = False                        # type: ignore
     return collection
 
 def new_annotation_page( data:Optional[dict] = None ) -> Collection:

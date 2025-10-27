@@ -27,6 +27,7 @@ from .utils.json_patterns import (
     force_as_object,
     force_as_singleton
 )
+from .utils.blender_setup import setup_camera
 
 
 import logging
@@ -100,8 +101,8 @@ class ImportManifest(Operator, ImportHelper):
         if bgColorHex:            
             bgColor=hex_to_rgba(bgColorHex)
             
-            scene_collection.background.color = bgColor
-            scene_collection.background.export = True
+            scene_collection.background.color = bgColor # type: ignore
+            scene_collection.background.export = True   # type: ignore
         
             del scene_data["backgroundColor"]
         
@@ -255,9 +256,13 @@ class ImportManifest(Operator, ImportHelper):
             logger.error("add camera error", exc)
 
         new_camera = bpy.context.active_object
-        if new_camera is None:
-            raise  ImportManifestError("failed to add camera")
-            
+        if new_camera is  None:
+             raise  ImportManifestError("failed to add camera")
+        # reminder 10/27/2025: The setup camera condigures the
+        # Blender camera focal length control and sensor 
+        # operations for field of view are done according to IIIF spec
+ 
+        setup_camera(new_camera)    
         configure_camera(   new_camera,
                             resource_data,
                             placement)

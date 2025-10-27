@@ -43,14 +43,6 @@ def configure_camera(   new_camera : Object,
     new_camera.rotation_mode = "QUATERNION"
     new_camera.rotation_quaternion = full_camera_placement[0].rotation.data # pyright: ignore[reportAttributeAccessIssue]
 
-    # set the "units" for the camera field to be "FOV", this 
-    # gives a more useful UI for adjusting the focal length of the
-    # camera
-    new_camera.data.lens_unit='FOV' # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-
-    # This will cause the value displayed in UI in Field Of View to
-    # be the vertical angle in degrees,
-    new_camera.data.sensor_fit = 'VERTICAL' # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
     return
 
 

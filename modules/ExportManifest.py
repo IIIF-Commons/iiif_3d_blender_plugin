@@ -90,8 +90,8 @@ class ExportManifest(Operator, ExportHelper):
         
         
         
-        if scene_collection.background.export:
-            backgroundColor = scene_collection.background.color
+        if scene_collection.background.export: # type: ignore
+            backgroundColor = scene_collection.background.color # type: ignore
             color_hex = rgba_to_hex( backgroundColor )
             logger.info("setting scene backgroundColor to %s" % color_hex)
             scene_data["backgroundColor"] = color_hex
