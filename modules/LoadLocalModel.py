@@ -165,8 +165,9 @@ def handler_for_mimetype( mimetype:str) -> Tuple[Callable[..., Set[str]] , str] 
         
         
     mimetype_importer_dict = {
-        "model/gltf-binary" : GLTF_IMPORTER,
-        "model/gltf+json"   : GLTF_IMPORTER,
+        "model/gltf-binary" :           GLTF_IMPORTER,
+        "model/gltf+json"   :           GLTF_IMPORTER,
+        "application/octet-stream"  :   GLTF_IMPORTER   
     }
     
     return mimetype_importer_dict[mimetype]
