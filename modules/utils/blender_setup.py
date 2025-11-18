@@ -32,7 +32,7 @@ def configure_blender_scene():
         scene.render.resolution_y = resolutionY
     return 
     
-def configure_camera(cameraObj):
+def setup_camera(cameraObj):
     """
     argument is the bpy.types.object for a camera
     """
@@ -40,24 +40,15 @@ def configure_camera(cameraObj):
     # set the "units" for the camera field to be "FOV", this 
     # gives a more useful UI for adjusting the focal length of the
     # camera
-    cameraObj.data.lens_unit='FOV'
-
+    cameraObj.data.lens_unit='FOV' 
     # This will cause the value displayed in UI in Field Of View to
     # be the vertical angle in degrees,
-    cameraObj.data.sensor_fit = 'VERTICAL'
+    cameraObj.data.sensor_fit = 'VERTICAL' 
     return
     
+
     
-_MANIFEST_DEFINED_BACKGROUND_COLOR="manifest_defined_background_color"
 
-_USE_NODES_FOR_BACKGROUND_COLOR = False
-
-def is_manifest_defined_background_color():
-    """
-    returns boolean if the _MANIFEST_DEFINED_BACKGROUND_COLOR
-    custom property has been defined and defined to a True
-    """
-    return bpy.context.scene.get(_MANIFEST_DEFINED_BACKGROUND_COLOR, None) or False
     
 def set_scene_background_color(blenderColor):
     """
@@ -69,15 +60,8 @@ def set_scene_background_color(blenderColor):
     generally will have rgba[3] = 1.0; no transparency
     """
     
-    if _USE_NODES_FOR_BACKGROUND_COLOR:
-        bpy.context.scene.world.use_nodes = True # pyright: ignore [reportOptionalMemberAccess]
-        background_node = bpy.context.scene.world.node_tree.nodes["Background"] # pyright: ignore [reportOptionalMemberAccess]
-        if background_node is not None:
-            background_node.inputs[0].default_value = blenderColor # pyright: ignore [reportAttributeAccessIssue]
-    else:
-        bpy.context.scene.world.use_nodes = False # pyright: ignore [reportOptionalMemberAccess]
-        bpy.context.scene.world.color = blenderColor[:3] # pyright: ignore [reportOptionalMemberAccess]
-    bpy.context.scene[_MANIFEST_DEFINED_BACKGROUND_COLOR] = True
+    bpy.context.scene.world.use_nodes = False        # type: ignore
+    bpy.context.scene.world.color = blenderColor[:3] # type: ignore
     return None
     
 def get_scene_background_color() -> tuple[float,float,float,float] | None :
@@ -89,13 +73,7 @@ def get_scene_background_color() -> tuple[float,float,float,float] | None :
     denoting red-green-blue-alpha color channel values
     generally will have rgba[3] = 1.0; no transparency
     """
-    if not is_manifest_defined_background_color():
-        return None
-
-    if _USE_NODES_FOR_BACKGROUND_COLOR:
-        raw_color = bpy.context.scene.world.node_tree.nodes["Background"].inputs[0].default_value # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
-    else:
-        raw_color = bpy.context.scene.world.color # pyright: ignore [reportOptionalMemberAccess]
+    raw_color = bpy.context.scene.world.color # type: ignore
         
     try:
         raw_color_list = [float(x) for x in raw_color]

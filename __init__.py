@@ -1,11 +1,29 @@
-from bpy.types import TOPBAR_MT_file_export, TOPBAR_MT_file_import,OUTLINER_MT_collection_new, OUTLINER_MT_collection , Menu
-from bpy.utils import register_class, unregister_class
+from bpy.types import ( TOPBAR_MT_file_export, 
+                        TOPBAR_MT_file_import,
+                        OUTLINER_MT_collection_new, 
+                        OUTLINER_MT_collection , 
+                        Menu)
+                        
 
-from .modules.exporter import ExportIIIF3DManifest
-from .modules.importer import ImportIIIF3DManifest
-from .modules.editing.import_model import ImportLocalModel, ImportNetworkModel
-from .modules.editing.new_manifest import NewManifest
-from .modules.editing.new_camera import NewCamera
+                        
+from bpy.utils import register_class, unregister_class
+from .modules.SceneBackground import (  register_background_properties, 
+                                        unregister_background_properties)
+                                        
+# Developer note: 2025-10-23 The reason we import RunUnitTests is so that we can
+# run it as an Operator from a python script
+from .modules.test import RunUnitTests
+
+
+from .modules.ExportManifest import ExportManifest
+from .modules.ImportManifest import ImportManifest
+from .modules.ImportLocalModel import ImportLocalModel
+from .modules.ImportNetworkModel import ImportNetworkModel
+from .modules.NewManifest import NewManifest
+from .modules.NewCamera import NewCamera
+from .modules.LoadLocalModel import LoadLocalModel
+from .modules.LoadNetworkModel import LoadNetworkModel
+from .modules.Configure3DViewport import Configure3DViewport
 
 from .modules.custom_props import (
     AddIIIF3DObjProperties,
@@ -23,13 +41,13 @@ import logging
 logger=logging.getLogger("iiif.init")
 
 
-class OUTLINER_MT_edit_manifest(Menu):
+class OUTLINER_MT_edit_manifest_anno_page(Menu):
     """
     intent is that this menu will be added to the popup
     menu associated with any Blender bpy.type.Collection
     which has an iiif_type property value of AnnotationPage
     """
-    bl_label="Manifest Editing"
+    bl_label="Add Painting Annotations"
     bl_idname="OUTLINER_MT_edit_manifest"
     
     def draw(self,context):
@@ -37,17 +55,26 @@ class OUTLINER_MT_edit_manifest(Menu):
         layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
         layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
         layout.operator(NewCamera.bl_idname, text="Add Camera")
+        
 
+
+
+
+    
 def menu_func_manifest_submenu(self,context):
     target_collection = context.collection
+    layout = self.layout
     if target_collection.get("iiif_type","") == "AnnotationPage":
-        self.layout.menu(OUTLINER_MT_edit_manifest.bl_idname, text="Edit Manifest") 
+        layout.menu(OUTLINER_MT_edit_manifest_anno_page.bl_idname, text="Add Painting Annotation") 
 
 classes = (
-    ImportIIIF3DManifest,
-    ExportIIIF3DManifest,
+    RunUnitTests,
+    ImportManifest,
+    ExportManifest,
     ImportLocalModel,
     ImportNetworkModel,
+    LoadLocalModel,
+    LoadNetworkModel,
     IIIFManifestPanel,
     AddIIIF3DObjProperties,
     AddIIIF3DCollProperties,
@@ -55,17 +82,18 @@ classes = (
     IIIF3DCollMetadataPanel,
     NewManifest,
     NewCamera,
-    OUTLINER_MT_edit_manifest
+    OUTLINER_MT_edit_manifest_anno_page,
+    Configure3DViewport
 )
 
 def menu_func_import(self, context):
     self.layout.operator(
-        ImportIIIF3DManifest.bl_idname, text="IIIF 3D Manifest (.json)"
+        ImportManifest.bl_idname, text="IIIF 3D Manifest (.json)"
     )
 
 def menu_func_export(self, context):
     self.layout.operator(
-        ExportIIIF3DManifest.bl_idname, text="IIIF 3D Manifest (.json)"
+        ExportManifest.bl_idname, text="IIIF 3D Manifest (.json)"
     )
     
     
@@ -79,13 +107,14 @@ def register():
         register_class(cls)
 
     register_ui_properties()
-
+    register_background_properties()
+    
     TOPBAR_MT_file_import.append(menu_func_import)
-    TOPBAR_MT_file_export.append(menu_func_export)
-    
-    OUTLINER_MT_collection_new.append(menu_func_new_manifest)
-    
+    TOPBAR_MT_file_export.append(menu_func_export)    
+    OUTLINER_MT_collection_new.append(menu_func_new_manifest)    
     OUTLINER_MT_collection.append(menu_func_manifest_submenu)
+    
+    
 
 def unregister():
     TOPBAR_MT_file_import.remove(menu_func_import)
@@ -95,6 +124,7 @@ def unregister():
     
     OUTLINER_MT_collection.append(menu_func_manifest_submenu)
 
+    unregister_background_properties()
     unregister_ui_properties()
 
     for cls in classes:
