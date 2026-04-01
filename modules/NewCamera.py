@@ -5,6 +5,7 @@ from mathutils import Vector, Quaternion
 from .editing.collections import new_annotation
 from .editing.transforms import Translation, Rotation, transformsToPlacements
 from .editing.cameras import configure_camera
+from .editing import generate_id
 #from .utils.coordinates import Coordinates
 from .utils.blender_setup import setup_camera
 
@@ -43,7 +44,8 @@ class NewCamera(Operator):
             setup_camera(new_camera)
             
             resource_data = {
-                "type" : "PerspectiveCamera"
+                "type" : "PerspectiveCamera",
+                "id"   : generate_id("PerspectiveCamera")
             }
 
             # the placement of the camera is intended to be out 

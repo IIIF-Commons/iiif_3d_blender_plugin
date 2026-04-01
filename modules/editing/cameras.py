@@ -8,6 +8,7 @@ from typing import List
 from . import generate_id
 from ..utils.json_patterns import force_as_singleton
 from ..editing.transforms import Transform, Rotation, Placement, transformsToPlacements
+from . import generate_id
 
 import logging
 logger = logging.getLogger("iiif.cameras")
@@ -48,6 +49,6 @@ def configure_camera(   new_camera : Object,
 
 def _initial_data() -> dict :
     return {
-        "id" : None,
+        "id" : generate_id("PerspectiveCamera"),
         "type": "PerspectiveCamera"
     }

@@ -216,12 +216,6 @@ class ExportManifest(Operator, ExportHelper):
 
     def resource_data_for_camera(self, blender_obj:bpy.types.Object) -> dict:
         resource_data = self.get_base_data(blender_obj)
-        
-        # July 3 2025 : We do not want to output an id for cameras that look like URLS
-        # because some viewers are trying to download these that are body resources
-        # of "painting" motivation annotations
-        if "id" in resource_data:
-            del resource_data["id"]
 
         foValue : float = float(blender_obj.data.angle_y) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         resource_data["fieldOfView"] =  math.degrees(foValue) 
