@@ -6,6 +6,7 @@ from bpy.props import StringProperty
 from bpy.types import Context, Operator, Object
 from bpy_extras.io_utils import ExportHelper
 from mathutils import Vector, Quaternion
+from .editing import generate_id
 
 from .utils.color import rgba_to_hex
 
@@ -155,6 +156,7 @@ class ExportManifest(Operator, ExportHelper):
         if (len(transforms) > 0):
             specific_resource = {
                 "type" : "SpecificResource",
+                "id"   : generate_id("SpecificResource"),
                 "transform" : [
                     t.to_iiif_dict() for t in transforms
                 ],
@@ -178,12 +180,14 @@ class ExportManifest(Operator, ExportHelper):
             def build_selector(tt:Translation) -> dict:
                 tmp = tt.to_iiif_dict()
                 tmp["type"]="PointSelector"
+                tmp["id"]  = generate_id("PointSelector")
                 return tmp
                 
             selector = build_selector( transforms[-1] )
             
             return {
                 "type": "SpecificResource",
+                "id"   : generate_id("SpecificResource"),
                 "selector" : selector,
                 "source"   : scene_resource
             }
