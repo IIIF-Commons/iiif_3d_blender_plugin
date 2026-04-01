@@ -24,7 +24,8 @@ class NewCamera(Operator):
     def execute(self, context):
         
         annotation_page_collection = context.collection
-        if not annotation_page_collection.get("iiif_type","") == "AnnotationPage":
+        if  annotation_page_collection is None or \
+            annotation_page_collection.get("iiif_type","") != "AnnotationPage":           
             logger.warning("invalid context.collection: %r" % (annotation_page_collection,))
             return {"CANCELLED"}
 
