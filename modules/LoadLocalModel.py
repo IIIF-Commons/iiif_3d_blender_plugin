@@ -148,7 +148,11 @@ def wrapped_gltf(*args, **keyw) -> Set[str]:
     saved_debug_value = bpy.app.debug_value
     bpy.app.debug_value = 1 # this is equivalent to logging.WARN
     try:
-        return bpy.ops.import_scene.gltf(*args, **keyw)
+        import_gltf_returnset = bpy.ops.import_scene.gltf(*args, **keyw)
+        if import_gltf_returnset is None:
+            logger.error("call to bpy.ops.import_scene.gltf returned None")
+            return {"CANCELLED"}
+        return import_gltf_returnset
     finally:
         bpy.app.debug_value = saved_debug_value
 

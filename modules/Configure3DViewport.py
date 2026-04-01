@@ -7,12 +7,13 @@ logger = logging.getLogger("iiif.configure_viewport")
 
 
 def findSpaceView3D(c:Context):
-    for window in c.window_manager.windows:
-         for area in window.screen.areas:
-            if area.type == 'VIEW_3D':
-                for space in area.spaces:
-                    if space.type == 'VIEW_3D':
-                        yield space # This is your SpaceView3D instance
+    if c.window_manager is not None:
+        for window in c.window_manager.windows:
+             for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    for space in area.spaces:
+                        if space.type == 'VIEW_3D':
+                            yield space # This is your SpaceView3D instance
 
 class Configure3DViewport(Operator):
     """

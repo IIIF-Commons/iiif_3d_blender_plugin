@@ -40,7 +40,7 @@ class IIIFManifestPanel(Panel):
 
         layout = self.layout
         scene = context.scene
-
-        layout.prop(scene, "iiif_manifest_id")
-        layout.prop(scene, "iiif_manifest_label")
-        layout.prop(scene, "iiif_manifest_summary")
+        if layout is not None and scene is not None:
+            layout.prop(scene, "iiif_manifest_id")
+            layout.prop(scene, "iiif_manifest_label")
+            layout.prop(scene, "iiif_manifest_summary")

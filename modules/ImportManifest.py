@@ -82,7 +82,8 @@ class ImportManifest(Operator, ImportHelper):
 
         # Store manifest metadata on the main scene collection
         main_collection = new_manifest( manifest_data )
-        move_collection_into_parent( main_collection, self.context.scene.collection)
+        if self.context.scene is not None:
+            move_collection_into_parent( main_collection, self.context.scene.collection)
 
         if "items" in manifest_data:
             for item in manifest_data["items"][:]: # iterate over a copy
