@@ -63,6 +63,7 @@ def configure_model(    new_model : Object,
         if "format" in resource_data and resource_data["format"] != mimetype:
             message=f'resource format ${resource_data["format"]} does not match ${mimetype}'
             logger.warn(message)
+        resource_data["format"] = mimetype
     new_model["iiif_type"] = "Model"
     new_model["iiif_json"] = json.dumps(resource_data)
 

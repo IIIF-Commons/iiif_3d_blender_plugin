@@ -9,6 +9,9 @@ import bpy
 from bpy.props import StringProperty
 from bpy.types import Context, Operator
 
+from .LoadLocalModel import handler_for_mimetype
+from .editing.models import  mimetype_from_extension
+
 import logging
 logger = logging.getLogger("iiif.import_network_model")
 
@@ -84,8 +87,26 @@ class LoadNetworkModel(Operator):
                 # URL data downloaded to local_filepath and 
                 # http_mimetype set to the Content-Type (or to "")
     
+            # logic for figuring out a mimetype to decode the resource as a 3D asset
+            def choose_mimetype():
+                for mime_choice in (http_mimetype, self.mimetype):
+                    try:
+                        handler_for_mimetype( mime_choice)
+                    except KeyError:
+                        continue
+                    return mime_choice
+                
+                # if neither http_mimetype, self.mimetype are supported,
+                # try to get somethinf from the extension on the model_basename
+                try:
+                    return mimetype_from_extension( model_basename )
+                except Exception:
+                    pass
                     
-            mimetype = self.mimetype or http_mimetype
+                # if all else fails, return mimetype for glb as the default:
+                return "model/gltf-binary"
+                         
+            mimetype = choose_mimetype()
             
             # call the ImportLocalModel Operator to import the contents
             # of the local_filepath file into Blender as a Blender Object

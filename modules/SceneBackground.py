@@ -47,9 +47,11 @@ class IIIBackgroundPanel(Panel):
         Panel unless the active collection  (instance of Collection)
         is one that organizes a IIIF Scene resource
         """
-        if context.collection.get("iiif_type","") == "Scene":
+        if  context.collection is not None and \
+            context.collection.get("iiif_type","") == "Scene":
             return True
-        return None
+        else:
+            return None
         
     def draw(self, context):
         if not context:

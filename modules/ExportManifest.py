@@ -6,6 +6,7 @@ from bpy.props import StringProperty
 from bpy.types import Context, Operator, Object
 from bpy_extras.io_utils import ExportHelper
 from mathutils import Vector, Quaternion
+from .editing import generate_id
 
 from .utils.color import rgba_to_hex
 
@@ -155,6 +156,7 @@ class ExportManifest(Operator, ExportHelper):
         if (len(transforms) > 0):
             specific_resource = {
                 "type" : "SpecificResource",
+                "id"   : generate_id("SpecificResource"),
                 "transform" : [
                     t.to_iiif_dict() for t in transforms
                 ],
@@ -178,12 +180,14 @@ class ExportManifest(Operator, ExportHelper):
             def build_selector(tt:Translation) -> dict:
                 tmp = tt.to_iiif_dict()
                 tmp["type"]="PointSelector"
+                tmp["id"]  = generate_id("PointSelector")
                 return tmp
                 
             selector = build_selector( transforms[-1] )
             
             return {
                 "type": "SpecificResource",
+                "id"   : generate_id("SpecificResource"),
                 "selector" : selector,
                 "source"   : scene_resource
             }
@@ -212,12 +216,6 @@ class ExportManifest(Operator, ExportHelper):
 
     def resource_data_for_camera(self, blender_obj:bpy.types.Object) -> dict:
         resource_data = self.get_base_data(blender_obj)
-        
-        # July 3 2025 : We do not want to output an id for cameras that look like URLS
-        # because some viewers are trying to download these that are body resources
-        # of "painting" motivation annotations
-        if "id" in resource_data:
-            del resource_data["id"]
 
         foValue : float = float(blender_obj.data.angle_y) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         resource_data["fieldOfView"] =  math.degrees(foValue) 

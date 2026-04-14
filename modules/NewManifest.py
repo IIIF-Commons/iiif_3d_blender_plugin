@@ -30,7 +30,8 @@ class NewManifest(Operator):
         logger.info("call Configure3DViewport")
         res = bpy.ops.iiif.configure_viewport() # pyright: ignore[reportAttributeAccessIssue]
         logger.info("result Configure3DViewport: %s" % res)
-        bpy.context.scene.collection.children.link(manifest)
+        if bpy.context.scene is not None and bpy.context.scene.collection is not None:
+            bpy.context.scene.collection.children.link(manifest)
         
         iiif_scene = new_scene()
         manifest.children.link(iiif_scene)

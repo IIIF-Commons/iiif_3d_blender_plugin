@@ -85,7 +85,8 @@ class ImportLocalModel(Operator,  ImportHelper):
         configure_model(new_model, model_data,placement)
         
         annotation_collection=new_annotation()
-        context.collection.children.link(annotation_collection) 
+        if context.collection is not None:
+            context.collection.children.link(annotation_collection) 
 
         
         LOOP_GUARD_MAX=8

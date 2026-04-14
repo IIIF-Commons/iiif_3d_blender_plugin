@@ -55,8 +55,9 @@ class ImportNetworkModel(Operator):
     def invoke(self, context, event):
         logger.info("ImportRemoteModel.invoke entered")
         self.model_url=""
-        rv = context.window_manager.invoke_props_dialog(self, width=640)
-        logger.info("return from invoke_props_dialog %r : %r" % (rv, self.model_url) )
+        if context.window_manager is not None:
+            rv = context.window_manager.invoke_props_dialog(self, width=640)
+            logger.info("return from invoke_props_dialog %r : %r" % (rv, self.model_url) )
         return rv
 
 
@@ -87,7 +88,8 @@ class ImportNetworkModel(Operator):
         configure_model(new_model, model_data,placement)
         
         annotation_collection=new_annotation()
-        context.collection.children.link(annotation_collection) 
+        if context.collection is not None:
+            context.collection.children.link(annotation_collection) 
 
         
         LOOP_GUARD_MAX=8

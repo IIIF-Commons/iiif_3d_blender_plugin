@@ -2,7 +2,9 @@ from __future__ import annotations
 from  typing import  Any, Dict, List,  Callable, Generator, Iterable
 from mathutils import Vector, Quaternion, Euler
 from math import radians, degrees,   pi
+from . import generate_id
 from bpy.types import Object
+
 
 # Dev Note: 9 Aug 2025
 # this import of annotations will allow the type hint system
@@ -88,7 +90,8 @@ class Translation(Transform):
         iv = [self.data.x, self.data.z, -self.data.y]
         
         # express as dictionary
-        retVal : Dict[str,Any] = {"type": TRANSLATE_TRANSFORM}
+        retVal : Dict[str,Any] = {  "type": TRANSLATE_TRANSFORM,
+                                    "id": generate_id(TRANSLATE_TRANSFORM) }
         for label, v in zip( XYZ, iv):
             if v != 0.0:
                 retVal[label] = v
@@ -147,7 +150,8 @@ class Rotation(Transform):
         iv = [degrees(r) for r in [euler.x, euler.z, -euler.y]]
         
         # express as dictionary
-        retVal : Dict[str,Any] = {"type": ROTATE_TRANSFORM}
+        retVal : Dict[str,Any] = {"type": ROTATE_TRANSFORM,
+                                    "id": generate_id(ROTATE_TRANSFORM) }
         for label, v in zip( XYZ, iv):
             if v != 0.0:
                 retVal[label] = v
@@ -259,7 +263,8 @@ class Scaling(Transform):
         iv = [self.data.x, self.data.z,self.data.y]
         
         # express as dictionary
-        retVal : Dict[str,Any] = {"type": SCALE_TRANSFORM}
+        retVal : Dict[str,Any] = {  "type": SCALE_TRANSFORM,
+                                    "id": generate_id(SCALE_TRANSFORM) }
         for label, v in zip( XYZ, iv):
             if v != 1.0:
                 retVal[label] = v

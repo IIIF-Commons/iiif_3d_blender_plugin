@@ -11,14 +11,13 @@ from ..editing.transforms import Transform, Rotation, Placement, transformsToPla
 
 import logging
 logger = logging.getLogger("iiif.cameras")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 def configure_camera(   new_camera : Object,                                                 
                         resource_data : dict,
                         placement : Placement ) -> None:
     if len(resource_data) == 0:
         resource_data = _initial_data()
-        resource_data["id"]=generate_id(resource_data["type"])
         
     if "type" not in resource_data:
         logger.warn("camera type not specified")
@@ -31,6 +30,7 @@ def configure_camera(   new_camera : Object,
         
     
     new_camera["iiif_type"] = resource_data["type"]
+    new_camera["iiif_id"]   = resource_data["id"]
     new_camera["iiif_json"] = json.dumps(resource_data)
     
     new_camera.location = placement.translation.data
@@ -47,7 +47,8 @@ def configure_camera(   new_camera : Object,
 
 
 def _initial_data() -> dict :
-    return {
-        "id" : None,
+    retVal = {
+        "id" : generate_id("PerspectiveCamera"),
         "type": "PerspectiveCamera"
     }
+    return retVal

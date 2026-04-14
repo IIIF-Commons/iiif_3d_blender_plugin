@@ -84,6 +84,7 @@ class LoadLocalModel(Operator):
         # so that an existing importer Operator can be wrapped at run-time
         # with a wrapper function that supplied other import arguments
 
+        logger.info(f"LoadLocalModel.execute self.mimetype: {self.mimetype}")
         try:
             handler, handler_name = handler_for_mimetype(self.mimetype)
         except KeyError:
@@ -147,13 +148,17 @@ def wrapped_gltf(*args, **keyw) -> Set[str]:
     saved_debug_value = bpy.app.debug_value
     bpy.app.debug_value = 1 # this is equivalent to logging.WARN
     try:
-        return bpy.ops.import_scene.gltf(*args, **keyw)
+        import_gltf_returnset = bpy.ops.import_scene.gltf(*args, **keyw)
+        if import_gltf_returnset is None:
+            logger.error("call to bpy.ops.import_scene.gltf returned None")
+            return {"CANCELLED"}
+        return import_gltf_returnset
     finally:
         bpy.app.debug_value = saved_debug_value
 
 def handler_for_mimetype( mimetype:str) -> Tuple[Callable[..., Set[str]] , str] :
     """
-    return 2-tuple (func, label)
+    return 2-tuple (func, label), or raises KeyError
     function is the callable, may be Blender defined operator call such as 
     bpy.ops.import_scene.gltf 
     label a string used only for logging messages
@@ -166,8 +171,7 @@ def handler_for_mimetype( mimetype:str) -> Tuple[Callable[..., Set[str]] , str] 
         
     mimetype_importer_dict = {
         "model/gltf-binary" :           GLTF_IMPORTER,
-        "model/gltf+json"   :           GLTF_IMPORTER,
-        "application/octet-stream"  :   GLTF_IMPORTER   
+        "model/gltf+json"   :           GLTF_IMPORTER  
     }
     
     return mimetype_importer_dict[mimetype]

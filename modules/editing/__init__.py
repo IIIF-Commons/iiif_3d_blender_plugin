@@ -1,14 +1,18 @@
 from typing import Optional
 import bpy
+import uuid
+    
+# module level constant
+RANDOM_TEXT  = str(uuid.uuid4())[:8]
 
 def generate_id(resource_type="Manifest") -> str:
     """
-    generates an identifier following the convention for a 
-    'blank node identifier' (see https://www.w3.org/TR/rdf11-concepts/#dfn-blank-node-identifier)
-    as references in JSON-LD 1.1 document (see https://www.w3.org/TR/json-ld11/ )
+    
     """
     import re
-    prefix = "_:%s/" % resource_type.lower()
+    
+    
+    prefix = "https://%s/%s/" % ( RANDOM_TEXT, resource_type.lower())
     re_pattern= re.compile( prefix+r"([0-9]+)\s*$" )
     imax=0
     for obj_or_col in ( list(bpy.data.objects) + list(bpy.data.collections) ):

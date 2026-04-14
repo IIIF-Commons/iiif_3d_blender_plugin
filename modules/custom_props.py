@@ -12,13 +12,13 @@ class AddIIIF3DObjProperties(Operator):
 
     def execute(self, context: Context) -> Set[str]:
         try:
-            obj = context.view_layer.objects.active
-            if obj is not None:
-                if "iiif_annotation_id" not in obj:
-                    obj["iiif_annotation_id"] = obj.name
-                if "iiif_source_url" not in obj:
-                    obj["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
-
+            if context.view_layer is not None:
+                obj = context.view_layer.objects.active
+                if obj is not None:
+                    if "iiif_annotation_id" not in obj:
+                        obj["iiif_annotation_id"] = obj.name
+                    if "iiif_source_url" not in obj:
+                        obj["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
             return {"FINISHED"}
         except Exception as e:
             import traceback
@@ -36,10 +36,11 @@ class AddIIIF3DCollProperties(Operator):
     def execute(self, context: Context) -> Set[str]:
         try:
             coll = context.collection
-            if "iiif_annotation_id" not in coll:
-                coll["iiif_annotation_id"] = coll.name
-            if "iiif_source_url" not in coll:
-                coll["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
+            if coll is not None:
+                if "iiif_annotation_id" not in coll:
+                    coll["iiif_annotation_id"] = coll.name
+                if "iiif_source_url" not in coll:
+                    coll["iiif_source_url"] = "https://example.org/iiif/3d/manifest.json"
 
             return {"FINISHED"}
         except Exception as e:

@@ -52,9 +52,10 @@ class OUTLINER_MT_edit_manifest_anno_page(Menu):
     
     def draw(self,context):
         layout = self.layout
-        layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
-        layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
-        layout.operator(NewCamera.bl_idname, text="Add Camera")
+        if layout is not None:
+            layout.operator(ImportLocalModel.bl_idname, text="Add Local Model")
+            layout.operator(ImportNetworkModel.bl_idname, text="Add Network Model")
+            layout.operator(NewCamera.bl_idname, text="Add Camera")
         
 
 

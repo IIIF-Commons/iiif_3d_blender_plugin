@@ -116,7 +116,7 @@ class Coordinates:
         
 
     @staticmethod
-    def coerce_to_euler( rotation : Euler | Quaternion , order:str ) -> Euler:
+    def coerce_to_euler( rotation : Euler | Quaternion , order ) -> Euler:
         if isinstance(rotation, Euler) and rotation.order != order :
             return rotation.to_quaternion().to_euler(order)
         elif isinstance(rotation, Quaternion):

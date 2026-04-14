@@ -44,12 +44,13 @@ def get_extension_id():
 needle = get_extension_id()
 logger.debug("needle is %s" % (needle,))
 ext_name = None
-logger.debug("addons.keys is %s" % ( "\n".join( context.preferences.addons.keys()),))
-for key in context.preferences.addons.keys():
-    if needle in key:
-        ext_name = key
-        logger.debug("ext_name is %s" % (ext_name,))
-        break
+
+if context.preferences is not None:
+    for key in context.preferences.addons.keys():
+        if needle in key:
+            ext_name = key
+            logger.debug("ext_name is %s" % (ext_name,))
+            break
 
 if not ext_name:
     print("Failed to find the plugin")
@@ -59,7 +60,8 @@ bpy.ops.preferences.addon_enable(module=ext_name)
 
 
 
-if ext_name not in context.preferences.addons:
+if  context.preferences is None or \
+    ext_name not in context.preferences.addons:
     print("Failed to load the plugin")
     sys.exit(1)
 
